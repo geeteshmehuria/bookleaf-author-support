@@ -11,7 +11,7 @@ Rule: anything that depends on "who is asking" (which author's books, which
 tickets) comes from the user returned here, never from an ID in the request.
 """
 import jwt
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.database import DbSession
@@ -32,6 +32,7 @@ def _unauthorized(code: str, message: str) -> APIError:
 
 
 def get_current_user(
+    request: Request,
     db: DbSession,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> User:
@@ -51,6 +52,7 @@ def get_current_user(
     user = db.get(User, payload["sub"])
     if user is None:
         raise _unauthorized("INVALID_TOKEN", "This account no longer exists")
+    request.state.user_id = user.id  # for the request log (called_by)
     return user
 
 

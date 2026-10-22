@@ -36,6 +36,7 @@ def login(body: LoginRequest, request: Request, db: DbSession) -> TokenResponse:
         raise APIError(401, "INVALID_CREDENTIALS", "Incorrect email or password")
 
     LOGIN_FAILS_PER_ACCOUNT.reset(account_key)  # a correct password clears earlier mistakes
+    request.state.user_id = user.id  # for the request log (called_by)
 
     token, expires_in = create_access_token(user.id, user.role_name)
     return TokenResponse(access_token=token, expires_in=expires_in, user=UserOut.model_validate(user))

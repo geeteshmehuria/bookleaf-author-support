@@ -55,6 +55,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
     else:
         code = STATUS_CODES.get(exc.status_code, "ERROR")
         message = "Not found" if exc.status_code == 404 else str(exc.detail)
+    request.state.error = f"{code}: {message}"  # picked up by the request-log middleware
     return JSONResponse(
         status_code=exc.status_code,
         content=error_body(code, message),
@@ -71,6 +72,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         details.append({"field": ".".join(loc) or None, "message": msg})
     first = details[0] if details else {"field": None, "message": "Invalid request"}
     summary = f"{first['field']}: {first['message']}" if first["field"] else first["message"]
+    request.state.error = f"VALIDATION_ERROR: {summary}"
     return JSONResponse(
         status_code=422,
         content=jsonable_encoder(error_body("VALIDATION_ERROR", summary, details)),
@@ -96,6 +98,8 @@ def register_error_handlers(app: FastAPI) -> None:
     async def catch_unhandled_errors(request: Request, call_next):
         try:
             return await call_next(request)
-        except Exception:
+        except Exception as exc:
             logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+            # Only the type goes to the request log; the full traceback stays in the server log.
+            request.state.error = f"INTERNAL_ERROR: {type(exc).__name__}"
             return internal_error_response()

@@ -1,10 +1,12 @@
+from datetime import datetime, timezone
+
 import pytest
 from sqlalchemy import delete, or_
 
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.rate_limit import ALL_LIMITERS
-from app.models import LlmLog
+from app.models import LlmLog, RequestLog
 
 
 @pytest.fixture(autouse=True)
@@ -23,8 +25,10 @@ def fresh_rate_limits():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def remove_test_ai_logs():
-    """Test tickets are deleted by each test file; also drop the llm_logs rows they produced."""
+def remove_test_logs():
+    """Test tickets are deleted by each test file; also drop the log rows the test run produced."""
+    started = datetime.now(timezone.utc)
     yield
     with SessionLocal() as db, db.begin():
         db.execute(delete(LlmLog).where(or_(LlmLog.user_prompt.contains("[pytest]"), LlmLog.user_prompt.contains("[e2e]"))))
+        db.execute(delete(RequestLog).where(RequestLog.start_on >= started))

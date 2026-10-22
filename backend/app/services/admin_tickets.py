@@ -66,9 +66,15 @@ def _apply_filters(stmt, f: QueueFilters, me: User):
     if f.created_to:
         stmt = stmt.where(Ticket.created_at < datetime.combine(f.created_to + timedelta(days=1), time.min, timezone.utc))
     if f.q and f.q.strip():
-        term = f"%{f.q.strip()}%"
+        # Escape LIKE wildcards so "%" or "_" typed by an admin are searched literally.
+        safe = f.q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        term = f"%{safe}%"
         number = f.q.strip().lstrip("#")
-        conditions = [Ticket.subject.ilike(term), User.name.ilike(term), User.email.ilike(term)]
+        conditions = [
+            Ticket.subject.ilike(term, escape="\\"),
+            User.name.ilike(term, escape="\\"),
+            User.email.ilike(term, escape="\\"),
+        ]
         # isascii: "²".isdigit() is True but int("²") fails; the bound keeps it inside Postgres INT
         if number.isascii() and number.isdigit() and int(number) <= 2_147_483_647:
             conditions.append(Ticket.ticket_number == int(number))

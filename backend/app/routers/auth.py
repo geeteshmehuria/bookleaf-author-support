@@ -1,8 +1,7 @@
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.deps import get_current_user
 from app.core.errors import APIError
 from app.core.rate_limit import LOGIN_FAILS_PER_ACCOUNT, LOGIN_FAILS_PER_IP, client_ip
@@ -15,7 +14,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/login", response_model=TokenResponse, responses=error_responses(401, 422, 429))
-def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
+def login(body: LoginRequest, request: Request, db: DbSession) -> TokenResponse:
     """Log in with email + password. Works for authors and admins; `user.role` says which.
 
     Copy `access_token` into Swagger's **Authorize** button to call protected routes.

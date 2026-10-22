@@ -85,7 +85,7 @@ def create_ticket(db: Session, author: User, data: TicketCreate) -> Ticket:
         # the AI classifies the ticket in the background (Phase 6).
     )
     db.add(ticket)
-    db.commit()
+    db.flush()  # write within this request's transaction; get_db commits at the end
     return get_author_ticket(db, author, ticket.id)
 
 
@@ -101,7 +101,7 @@ def add_author_reply(db: Session, author: User, ticket: Ticket, body: str) -> Ti
     if ticket.status == TicketStatus.RESOLVED:
         ticket.status = TicketStatus.OPEN
     ticket.updated_at = now()
-    db.commit()
+    db.flush()  # write within this request's transaction; get_db commits at the end
     db.expire(ticket)
     return get_author_ticket(db, author, ticket.id)
 

@@ -6,9 +6,8 @@ else's books, even by editing the URL.
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.deps import require_author
 from app.core.errors import APIError
 from app.models import Book, User
@@ -19,7 +18,7 @@ router = APIRouter(prefix="/books", tags=["Books"], responses=error_responses(40
 
 
 @router.get("", response_model=list[BookOut])
-def list_my_books(author: User = Depends(require_author), db: Session = Depends(get_db)) -> list[Book]:
+def list_my_books(db: DbSession, author: User = Depends(require_author)) -> list[Book]:
     """All books of the logged-in author. Newest first; books still in production come first."""
     return list(
         db.scalars(
@@ -31,7 +30,7 @@ def list_my_books(author: User = Depends(require_author), db: Session = Depends(
 
 
 @router.get("/{book_id}", response_model=BookOut, responses=error_responses(404))
-def get_my_book(book_id: str, author: User = Depends(require_author), db: Session = Depends(get_db)) -> Book:
+def get_my_book(book_id: str, db: DbSession, author: User = Depends(require_author)) -> Book:
     """One book. Another author's book gives 404, not 403, so the response
     doesn't reveal that the ID exists."""
     book = db.scalar(select(Book).where(Book.id == book_id, Book.author_id == author.id))

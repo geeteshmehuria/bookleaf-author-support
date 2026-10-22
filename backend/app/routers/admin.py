@@ -6,9 +6,8 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.deps import require_admin
 from app.models import Ticket, TicketCategory, TicketPriority, TicketStatus, User
 from app.schemas.admin import (
@@ -40,6 +39,7 @@ router = APIRouter(
 
 @router.get("/tickets", response_model=TicketPage)
 def ticket_queue(
+    db: DbSession,
     status: list[TicketStatus] | None = Query(None, description="Repeat to pick several: ?status=Open&status=In Progress"),
     category: list[TicketCategory] | None = Query(None),
     priority: list[TicketPriority] | None = Query(None),
@@ -53,7 +53,6 @@ def ticket_queue(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     admin: User = Depends(require_admin),
-    db: Session = Depends(get_db),
 ) -> TicketPage:
     """All tickets from all authors, filterable and sorted by urgency by default."""
     f = QueueFilters(
@@ -66,13 +65,13 @@ def ticket_queue(
 
 
 @router.get("/tickets/{ticket_id}", response_model=AdminTicketDetail, responses=error_responses(404))
-def ticket_detail(ticket_id: str, db: Session = Depends(get_db)) -> AdminTicketDetail:
+def ticket_detail(ticket_id: str, db: DbSession) -> AdminTicketDetail:
     """Full ticket: thread, internal notes, author profile and the book's data."""
     return svc.to_detail(svc.get_ticket(db, parse_ticket_id(ticket_id)))
 
 
 @router.patch("/tickets/{ticket_id}", response_model=AdminTicketDetail, responses=error_responses(404, 422))
-def update_ticket(ticket_id: str, body: TicketUpdate, db: Session = Depends(get_db)) -> AdminTicketDetail:
+def update_ticket(ticket_id: str, body: TicketUpdate, db: DbSession) -> AdminTicketDetail:
     """Change status, override category / priority, or (un)assign. Send only what changes.
     The AI's original suggestion stays in ai_category / ai_priority for comparison."""
     ticket = svc.get_ticket(db, parse_ticket_id(ticket_id))
@@ -81,7 +80,10 @@ def update_ticket(ticket_id: str, body: TicketUpdate, db: Session = Depends(get_
 
 @router.post("/tickets/{ticket_id}/notes", response_model=AdminTicketDetail, status_code=201, responses=error_responses(404, 422))
 def add_note(
-    ticket_id: str, body: NoteCreate, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+    ticket_id: str,
+    body: NoteCreate,
+    db: DbSession,
+    admin: User = Depends(require_admin),
 ) -> AdminTicketDetail:
     """Internal note. Visible to admins only, never to the author."""
     ticket = svc.get_ticket(db, parse_ticket_id(ticket_id))
@@ -90,7 +92,10 @@ def add_note(
 
 @router.post("/tickets/{ticket_id}/replies", response_model=AdminTicketDetail, status_code=201, responses=error_responses(404, 422))
 def reply(
-    ticket_id: str, body: AdminReplyCreate, admin: User = Depends(require_admin), db: Session = Depends(get_db)
+    ticket_id: str,
+    body: AdminReplyCreate,
+    db: DbSession,
+    admin: User = Depends(require_admin),
 ) -> AdminTicketDetail:
     """Reply to the author (appears in their thread). Moves Open -> In Progress and
     assigns the ticket to the sender if nobody owns it yet."""
@@ -101,7 +106,7 @@ def reply(
 # --- AI ---------------------------------------------------------------------
 
 @router.get("/tickets/{ticket_id}/draft", response_model=DraftOut, responses=error_responses(404))
-def get_draft(ticket_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> DraftOut:
+def get_draft(ticket_id: str, db: DbSession, admin: User = Depends(require_admin)) -> DraftOut:
     """AI-drafted reply. Made on first request, then served from the cache (no new AI call).
     If the AI is unavailable this still returns 200 with `available: false` and a `reason`,
     so the admin simply writes the reply by hand."""
@@ -110,14 +115,14 @@ def get_draft(ticket_id: str, admin: User = Depends(require_admin), db: Session 
 
 
 @router.post("/tickets/{ticket_id}/draft", response_model=DraftOut, responses=error_responses(404))
-def regenerate_draft(ticket_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> DraftOut:
+def regenerate_draft(ticket_id: str, db: DbSession, admin: User = Depends(require_admin)) -> DraftOut:
     """Make a fresh draft (e.g. after the author wrote again, or the category was changed)."""
     ticket = svc.get_ticket(db, parse_ticket_id(ticket_id))
     return get_or_generate(db, ticket, admin, regenerate=True)
 
 
 @router.post("/tickets/{ticket_id}/classify", response_model=AdminTicketDetail, responses=error_responses(404, 503))
-def reclassify(ticket_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> AdminTicketDetail:
+def reclassify(ticket_id: str, db: DbSession, admin: User = Depends(require_admin)) -> AdminTicketDetail:
     """Run the AI classification again and apply it (e.g. after the AI was down when the ticket came in)."""
     ticket = svc.get_ticket(db, parse_ticket_id(ticket_id))
     try:
@@ -125,13 +130,13 @@ def reclassify(ticket_id: str, admin: User = Depends(require_admin), db: Session
     except LLMUnavailable as e:
         raise APIError(503, "AI_UNAVAILABLE", f"AI classification failed: {e.reason}")
     ticket.updated_at = svc.now()
-    db.commit()
+    db.flush()
     db.expire_all()
     return svc.to_detail(svc.get_ticket(db, ticket.id))
 
 
 @router.get("/team", response_model=list[PersonOut])
-def team(db: Session = Depends(get_db)) -> list[User]:
+def team(db: DbSession) -> list[User]:
     """Admins a ticket can be assigned to."""
     return svc.list_team(db)
 
@@ -146,7 +151,7 @@ class QueueSummary(BaseModel):
 
 
 @router.get("/summary", response_model=QueueSummary)
-def queue_summary(admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> QueueSummary:
+def queue_summary(db: DbSession, admin: User = Depends(require_admin)) -> QueueSummary:
     """Ticket counts for the admin dashboard."""
     unresolved = Ticket.status.in_(svc.UNRESOLVED)
     by_status = dict(db.execute(select(Ticket.status, func.count()).group_by(Ticket.status)).all())

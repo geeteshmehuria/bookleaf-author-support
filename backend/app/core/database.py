@@ -1,5 +1,8 @@
+from typing import Annotated
+
+from fastapi import Depends
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
 
@@ -28,9 +31,23 @@ class Base(DeclarativeBase):
 
 
 def get_db():
-    """FastAPI dependency: one DB session per request, always closed afterwards."""
+    """One session and ONE transaction per request (unit of work).
+
+    The route and the services it calls only read, add and flush; they never commit.
+    If the route finishes, everything is committed together. If anything fails, it is all
+    rolled back, so a request can't leave half its changes in the database.
+    """
     db = SessionLocal()
     try:
         yield db
+        db.commit()
+    except BaseException:
+        db.rollback()
+        raise
     finally:
         db.close()
+
+
+# scope="function": the commit above runs BEFORE the response is sent. With FastAPI's default
+# it runs after, and a failed commit would still have told the client "201 Created".
+DbSession = Annotated[Session, Depends(get_db, scope="function")]

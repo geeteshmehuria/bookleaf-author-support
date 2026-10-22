@@ -13,9 +13,8 @@ tickets) comes from the user returned here, never from an ID in the request.
 import jwt
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.database import DbSession
 from app.core.errors import APIError
 from app.core.security import decode_access_token
 from app.models import User
@@ -33,8 +32,8 @@ def _unauthorized(code: str, message: str) -> APIError:
 
 
 def get_current_user(
+    db: DbSession,
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
 ) -> User:
     """Return the logged-in user, or 401. Protects every non-public route."""
     if credentials is None:

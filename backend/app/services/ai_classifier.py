@@ -119,18 +119,17 @@ def classify_by_rules(subject: str, description: str) -> tuple[Cat, Pri, str]:
 
 # --- Main entry points -----------------------------------------------------
 
-def _ask_ai(ticket: Ticket, called_by: str | None) -> Classification:
-    today = today_local()
+def _ask_ai(ticket_id: uuid.UUID, user_prompt: str, context: dict, called_by: str | None) -> Classification:
     result = call_llm(
         operation="classify_priority",
         model=settings.classify_model,
         system=SYSTEM_PROMPT,
-        user=build_user_prompt(ticket, today),
+        user=user_prompt,
         response_schema=Classification,
         max_output_tokens=2048,  # JSON is ~60 tokens; the rest is room for the model's thinking
-        ticket_id=ticket.id,
+        ticket_id=ticket_id,
         called_by=called_by,
-        context={"book_id": ticket.book_id, "today": today.isoformat()},
+        context=context,
     )
     try:
         # Validate ourselves too: never trust the model's JSON blindly.
@@ -149,23 +148,40 @@ def classify_ticket(db: Session, ticket: Ticket, *, called_by: str | None = None
     already changed them is never overruled.
     Admin re-run (admin_requested=True): AI only; on failure raise LLMUnavailable so the admin
     sees why. On success the AI's answer becomes the active value (the admin asked for it).
+
+    Only flushes: the caller's transaction commits (get_db for a request, the task below otherwise).
     """
-    untouched = ticket.category == DEFAULT_CATEGORY and ticket.priority == DEFAULT_PRIORITY
+    today = today_local()
+    ticket_id, subject, description = ticket.id, ticket.subject, ticket.description
+    user_prompt = build_user_prompt(ticket, today)
+    context = {"book_id": ticket.book_id, "today": today.isoformat()}
+    # End the read-only transaction before the slow AI call (up to AI_TIMEOUT_SECONDS): the
+    # connection goes back to the pool instead of sitting "idle in transaction" while we wait.
+    db.rollback()
+
     try:
-        c = _ask_ai(ticket, called_by)
+        c = _ask_ai(ticket_id, user_prompt, context, called_by)
+        error = None
+    except LLMUnavailable as e:
+        if admin_requested:
+            raise
+        c, error = None, e
+
+    # Reload: an admin may have changed the ticket while the AI was answering.
+    ticket = db.get(Ticket, ticket_id, populate_existing=True)
+    untouched = ticket.category == DEFAULT_CATEGORY and ticket.priority == DEFAULT_PRIORITY
+    if c is not None:
         ticket.ai_category, ticket.ai_priority, ticket.ai_reasoning = c.category, c.priority, c.reasoning
         if admin_requested or untouched:
             ticket.category, ticket.priority = c.category, c.priority
         source = "ai"
-    except LLMUnavailable as e:
-        if admin_requested:
-            raise
-        category, priority, why = classify_by_rules(ticket.subject, ticket.description)
-        ticket.ai_reasoning = f"{RULES_PREFIX} ({why}). AI unavailable: {e.reason}."
+    else:
+        category, priority, why = classify_by_rules(subject, description)
+        ticket.ai_reasoning = f"{RULES_PREFIX} ({why}). AI unavailable: {error.reason}."
         if untouched:
             ticket.category, ticket.priority = category, priority
         source = "rules"
-    db.commit()
+    db.flush()
     return source
 
 
@@ -176,6 +192,7 @@ def classify_ticket_task(ticket_id: uuid.UUID, called_by: str | None = None) -> 
             ticket = db.get(Ticket, ticket_id)
             if ticket is not None and ticket.ai_category is None:
                 classify_ticket(db, ticket, called_by=called_by)
+                db.commit()
     except Exception:
         logger.exception("Background classification failed for ticket %s", ticket_id)
 

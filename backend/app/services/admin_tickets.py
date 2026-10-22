@@ -149,16 +149,16 @@ def update_ticket(db: Session, ticket: Ticket, data: TicketUpdate) -> Ticket:
         ticket.assigned_to = assignee_id
 
     ticket.updated_at = now()
-    db.commit()
-    db.expire_all()
+    db.flush()  # write within this request's transaction; get_db commits at the end
+    db.expire_all()  # reload relationships (notes, replies, assignee) on the next read
     return get_ticket(db, ticket.id)
 
 
 def add_note(db: Session, ticket: Ticket, admin: User, body: str) -> Ticket:
     db.add(InternalNote(ticket_id=ticket.id, admin_id=admin.id, body=body))
     # Notes don't bump updated_at: the author's "Updated" time shouldn't move for a change they can't see.
-    db.commit()
-    db.expire_all()
+    db.flush()  # write within this request's transaction; get_db commits at the end
+    db.expire_all()  # reload relationships (notes, replies, assignee) on the next read
     return get_ticket(db, ticket.id)
 
 
@@ -171,8 +171,8 @@ def add_reply(db: Session, ticket: Ticket, admin: User, body: str, is_ai_drafted
     if ticket.assigned_to is None:
         ticket.assigned_to = admin.id  # whoever answers owns it, unless someone already does
     ticket.updated_at = now()
-    db.commit()
-    db.expire_all()
+    db.flush()  # write within this request's transaction; get_db commits at the end
+    db.expire_all()  # reload relationships (notes, replies, assignee) on the next read
     return get_ticket(db, ticket.id)
 
 

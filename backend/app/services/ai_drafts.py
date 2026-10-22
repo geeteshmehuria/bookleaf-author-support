@@ -187,14 +187,14 @@ def _last_author_activity(ticket: Ticket) -> datetime:
     return max([ticket.created_at, *author_msgs])
 
 
-def _out(draft: TicketDraft, ticket: Ticket, cached: bool) -> DraftOut:
+def _out(draft: TicketDraft, last_author_activity: datetime, cached: bool) -> DraftOut:
     return DraftOut(
         available=True,
         text=draft.draft_text,
         generated_at=draft.generated_at,
         model=draft.model_used,
         cached=cached,
-        stale=draft.generated_at < _last_author_activity(ticket),
+        stale=draft.generated_at < last_author_activity,
     )
 
 
@@ -202,32 +202,41 @@ def get_or_generate(db: Session, ticket: Ticket, admin: User, *, regenerate: boo
     if not regenerate:
         cached = db.scalar(select(TicketDraft).where(TicketDraft.ticket_id == ticket.id))
         if cached is not None:
-            return _out(cached, ticket, cached=True)
+            return _out(cached, _last_author_activity(ticket), cached=True)
 
+    # Read everything the prompt needs first...
     today = today_local()
+    ticket_id, admin_id = ticket.id, admin.id
+    last_activity = _last_author_activity(ticket)
+    system, user = build_system_prompt(ticket.category), build_user_prompt(ticket, today)
+    context = {
+        "kb_section": ticket.category.value,
+        "book_id": ticket.book_id,
+        "messages_sent": min(len(ticket.responses), RECENT_MESSAGES),
+        "messages_total": len(ticket.responses),
+    }
+    # End the read-only transaction before the slow AI call (up to AI_TIMEOUT_SECONDS): the
+    # connection goes back to the pool instead of sitting "idle in transaction" while we wait.
+    db.rollback()
+
+    # ...then call the AI with no transaction open...
     try:
         result = call_llm(
             operation="draft_response",
             model=settings.GEMINI_MODEL.strip(),
-            system=build_system_prompt(ticket.category),
-            user=build_user_prompt(ticket, today),
+            system=system,
+            user=user,
             max_output_tokens=4096,  # reply is ~250 tokens; the rest is room for the model's thinking
-            ticket_id=ticket.id,
-            called_by=admin.id,
-            context={
-                "kb_section": ticket.category.value,
-                "book_id": ticket.book_id,
-                "messages_sent": min(len(ticket.responses), RECENT_MESSAGES),
-                "messages_total": len(ticket.responses),
-            },
+            ticket_id=ticket_id,
+            called_by=admin_id,
+            context=context,
         )
     except LLMUnavailable as e:
         return DraftOut(available=False, reason=e.reason)
 
-    now = datetime.now(timezone.utc)
-    values = {"ticket_id": ticket.id, "draft_text": result.text, "model_used": result.model, "generated_at": now}
+    # ...and save the result in a new, short transaction (committed by get_db).
+    values = {"ticket_id": ticket_id, "draft_text": result.text, "model_used": result.model, "generated_at": datetime.now(timezone.utc)}
     stmt = insert(TicketDraft).values(id=uuid.uuid4(), **values)
     db.execute(stmt.on_conflict_do_update(index_elements=[TicketDraft.ticket_id], set_=values))
-    db.commit()
-    draft = db.scalar(select(TicketDraft).where(TicketDraft.ticket_id == ticket.id))
-    return _out(draft, ticket, cached=False)
+    draft = db.scalar(select(TicketDraft).where(TicketDraft.ticket_id == ticket_id).execution_options(populate_existing=True))
+    return _out(draft, last_activity, cached=False)

@@ -193,6 +193,7 @@ def test_ai_never_overrules_an_admin_change(tok, fake):
     with SessionLocal() as db:  # a late background run
         ticket = db.get(Ticket, t["id"])
         classify_ticket(db, ticket)
+        db.commit()  # outside a request, the caller owns the transaction
     d = admin_view(tok, t["id"])
     assert (d["category"], d["priority"]) == ("General Inquiry", "Low")  # admin's choice kept
     assert d["ai_category"] == "Royalty & Payments"  # AI suggestion still recorded

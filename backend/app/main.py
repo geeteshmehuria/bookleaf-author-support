@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.errors import register_error_handlers
-from app.routers import admin, auth, books, health
+from app.routers import admin, auth, books, health, tickets
 
 logging.basicConfig(level=logging.INFO)
 
@@ -33,6 +33,7 @@ app.add_middleware(
 app.include_router(health.router, prefix=settings.API_V1_STR)
 app.include_router(auth.router, prefix=settings.API_V1_STR)
 app.include_router(books.router, prefix=settings.API_V1_STR)
+app.include_router(tickets.router, prefix=settings.API_V1_STR)
 app.include_router(admin.router, prefix=settings.API_V1_STR)
 
 

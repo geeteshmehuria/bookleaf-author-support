@@ -4,7 +4,7 @@ import { RequireRole } from "@/components/auth/RequireRole"
 import HealthCheck from "@/pages/HealthCheck"
 import Login from "@/pages/Login"
 import AuthorArea from "@/pages/author/AuthorArea"
-import AdminDemo from "@/pages/AdminDemo"
+import AdminArea from "@/pages/admin/AdminArea"
 
 // Dev-only styleguide: the import is dropped from production builds.
 const ThemePreview = import.meta.env.DEV ? lazy(() => import("@/pages/ThemePreview")) : null
@@ -27,7 +27,7 @@ export default function App() {
         path="/admin/*"
         element={
           <RequireRole role="admin">
-            <AdminDemo />
+            <AdminArea />
           </RequireRole>
         }
       />

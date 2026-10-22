@@ -58,3 +58,13 @@ export function formatDateTime(isoTimestamp) {
     minute: "2-digit",
   })
 }
+
+/** 0.4 -> "<1h", 5.2 -> "5h", 52 -> "2d 4h" (how long someone has been waiting) */
+export function formatHours(hours) {
+  if (hours == null) return DASH
+  if (hours < 1) return "<1h"
+  if (hours < 24) return `${Math.floor(hours)}h`
+  const d = Math.floor(hours / 24)
+  const h = Math.floor(hours % 24)
+  return h ? `${d}d ${h}h` : `${d}d`
+}

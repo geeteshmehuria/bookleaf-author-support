@@ -3,7 +3,8 @@ import { api } from "@/services/api"
 
 /**
  * Load data from a GET endpoint.
- *   const { data, error, loading, reload } = useApi("/books")
+ *   const { data, error, loading, reload, setData } = useApi("/books")
+ * setData replaces the data with a fresher copy (e.g. the ticket an update call returned).
  * Ignores a response that arrives after the component unmounted or the path changed.
  */
 export function useApi(path) {
@@ -23,5 +24,6 @@ export function useApi(path) {
   }, [path, attempt])
 
   const reload = useCallback(() => setAttempt((n) => n + 1), [])
-  return { ...state, reload }
+  const setData = useCallback((data) => setState({ data, error: null, loading: false }), [])
+  return { ...state, reload, setData }
 }

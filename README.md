@@ -7,7 +7,7 @@ Helps BookLeaf's support team answer author queries faster.
 
 **Live demo:** _coming soon_ · **API docs:** `/api/v1/docs` (Swagger)
 
-> Work in progress. Sections marked _(in progress)_ are not built yet.
+> Work in progress: live demo and deployment still to come.
 
 ## Run locally
 
@@ -57,7 +57,7 @@ Every author in `data/bookleaf_sample_data.json` can log in with `Author@123`. E
 | One error format: `{"error": {"code", "message"}}` | Frontend handles every error the same way; no raw 500s reach the browser |
 | AI runs after the ticket is saved | A slow or failing AI never blocks an author |
 | Queue sorted by urgency: unresolved first, then Critical → Low, then oldest; rows waiting on us over 48 h are flagged red | The brief asks for urgent and old tickets to be easy to spot; 48 h is the reply time the team promises |
-| Polling (5 s author, 10 s admin) instead of WebSockets | Simple, easy to explain, works on free hosting _(in progress)_ |
+| Polling (5 s author, 10 s admin) instead of WebSockets | Simple, easy to explain, works on free hosting. Pauses while the tab is hidden; a refresh never overwrites a newer local change (`hooks/use-api.js`) |
 | React + Vite + shadcn/ui | Fast to build, accessible components we own; design notes in [`frontend/DESIGN.md`](frontend/DESIGN.md) |
 
 ## AI integration
@@ -122,11 +122,26 @@ Full interactive docs: http://localhost:8000/api/v1/docs. All paths start with `
 | GET | `/admin/team` | admin | Admins a ticket can be assigned to |
 | GET | `/admin/summary` | admin | Ticket counts for the dashboard |
 
-Status codes: 401 not logged in or bad token, 403 wrong role, 404 not found, 422 invalid input (lists each field).
+Status codes: 401 not logged in or bad token, 403 wrong role, 404 not found, 413 body over 64 KB, 422 invalid input (lists each field), 429 rate limited (with a `Retry-After` header).
+
+## Security
+
+| Protection | How |
+|---|---|
+| Passwords | bcrypt; same error and same response time for a wrong email or a wrong password |
+| Login rate limit | 5 failed attempts per account + IP, and 20 per IP, per 15 min, then 429. Checked before the password; a correct login clears the count |
+| AI cost limit | 5 new tickets per author per 10 min; 10 AI calls per user and 30 in total per minute. Over the limit the AI is skipped and the app falls back (keyword rules / manual reply) |
+| Access control | Role read from the database on every request; author data filtered by the token, never by an ID from the request; another author's ticket or book returns 404 |
+| Input | Pydantic limits on every field; request bodies over 64 KB rejected; search wildcards escaped; ORM only (no raw SQL with user input) |
+| Browser | CORS allows only the frontend's origin, no cookies; `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS in production |
+| Secrets | Only in environment variables; `.env` is git-ignored; the Gemini key never reaches the browser; the server refuses a short or example `JWT_SECRET` |
+| AI | Author text is fenced as data in prompts; drafts are never sent automatically; prompts carry no email, phone or internal notes |
+
+Rate-limit counts are kept in memory, which suits the single server this runs on. With several servers they would move to Redis. On Render, start uvicorn with `--proxy-headers --forwarded-allow-ips='*'` so limits see the visitor's real IP, not the proxy's: `--proxy-headers` alone only trusts a proxy on 127.0.0.1, so every visitor would share one IP and 20 failed logins from anyone would lock out everyone. Trusting `*` is only safe because Render's proxy is the only way in; it also means a client can fake its IP, so per-IP limits slow down casual guessing but don't stop a determined attacker.
 
 ## Known limitations
 
-- No rate limit on login, and tokens can't be revoked before they expire (24 h).
+- Tokens can't be revoked before they expire (24 h); rate-limit counters reset when the server restarts.
 - Login token is kept in `localStorage`; an httpOnly cookie would be safer.
 - File attachments are UI only (the form shows the chosen file names; nothing is uploaded).
 - Polling instead of WebSockets.

@@ -3,6 +3,7 @@ from sqlalchemy import delete, or_
 
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.core.rate_limit import ALL_LIMITERS
 from app.models import LlmLog
 
 
@@ -12,6 +13,13 @@ def no_real_ai(monkeypatch):
     a GEMINI_API_KEY in backend/.env would make every test run call (and pay for) the real API.
     Tests that exercise the AI install a fake Gemini on top of this (tests/test_ai.py)."""
     monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+
+
+@pytest.fixture(autouse=True)
+def fresh_rate_limits():
+    """Each test starts with empty rate-limit counters, so tests don't trip each other's limits."""
+    for limiter in ALL_LIMITERS:
+        limiter.reset()
 
 
 @pytest.fixture(scope="session", autouse=True)

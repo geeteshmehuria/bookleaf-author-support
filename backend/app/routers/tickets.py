@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import require_author
+from app.core.rate_limit import TICKETS_PER_AUTHOR
 from app.models import User
 from app.schemas.common import error_responses
 from app.schemas.tickets import AuthorTicketDetail, AuthorTicketSummary, ReplyCreate, TicketCreate
@@ -22,7 +23,7 @@ router = APIRouter(
 )
 
 
-@router.post("", response_model=AuthorTicketDetail, status_code=201, responses=error_responses(422))
+@router.post("", response_model=AuthorTicketDetail, status_code=201, responses=error_responses(422, 429))
 def create_ticket(
     body: TicketCreate,
     background: BackgroundTasks,
@@ -33,6 +34,7 @@ def create_ticket(
 
     The ticket is saved and returned first; AI classification runs afterwards in the
     background, so a slow or failing AI never delays or blocks the author."""
+    TICKETS_PER_AUTHOR.hit(author.id)  # each new ticket costs an AI call
     ticket = svc.create_ticket(db, author, body)
     background.add_task(classify_ticket_task, ticket.id, author.id)
     return svc.to_author_detail(ticket)

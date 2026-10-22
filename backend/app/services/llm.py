@@ -23,6 +23,7 @@ from google.genai import errors, types
 
 from app.core.config import settings
 from app.core.database import SessionLocal
+from app.core.rate_limit import AI_CALLS_PER_USER, AI_CALLS_TOTAL
 from app.models import LlmLog, LlmLogStatus
 
 logger = logging.getLogger("bookleaf.ai")
@@ -143,6 +144,16 @@ def call_llm(
         _log(**base_log, status=LlmLogStatus.FALLBACK, is_fallback_used=True,
              error_message="AI not configured (GEMINI_API_KEY / GEMINI_MODEL empty)")
         raise LLMUnavailable("AI is not configured on the server", LlmLogStatus.FALLBACK)
+
+    # Our own limit, checked before calling Google: protects the quota from one busy user or a bug.
+    user_key = called_by or "system"
+    wait = max(AI_CALLS_PER_USER.retry_after(user_key), AI_CALLS_TOTAL.retry_after("all"))
+    if wait:
+        reason = f"Too many AI requests right now; try again in {wait} s"
+        _log(**base_log, status=LlmLogStatus.RATE_LIMITED, is_fallback_used=True, error_message=reason)
+        raise LLMUnavailable(reason, LlmLogStatus.RATE_LIMITED)
+    AI_CALLS_PER_USER.record(user_key)
+    AI_CALLS_TOTAL.record("all")
 
     config = _config(system, max_output_tokens, response_schema)
     started = time.perf_counter()

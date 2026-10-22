@@ -203,6 +203,57 @@ Open http://localhost:5173. You should see the BookLeaf Portal page with **Statu
 
 ---
 
+## Design system
+
+The UI matches BookLeaf Publishing's brand (coral + soft pink), adapted for dashboards: white/grey surfaces, coral only for actions, active navigation and alerts.
+
+**Preview everything:** run the frontend and open http://localhost:5173/theme-preview. It shows all colors, type sizes, components and the three layouts (login, author, admin). This page exists only in development, not in the production build.
+
+### Where things live
+
+| File | What it holds |
+|---|---|
+| `frontend/src/styles/tokens.css` | **All** colors, radii, shadows and fonts (the only file with hex values) and their mapping into Tailwind |
+| `frontend/src/index.css` | Base styles: 14px body, bold headings, visible keyboard focus |
+| `frontend/src/components/ui/` | Button, Input, Textarea, Select, Checkbox, Card, Badge (+ StatusBadge, PriorityBadge), StatCard, Table, Alert, Toast |
+| `frontend/src/components/layout/` | `AuthLayout` (login screen), `AppShell` (sidebar + top bar, drawer on mobile) |
+
+Tailwind v4 has no `tailwind.config.js`; the theme is set with `@theme` in `tokens.css`.
+
+### Using it
+
+```jsx
+import { Button, Card, Input, StatusBadge, useToast } from '../components/ui'
+
+<Button>Save</Button>                                   // primary, 40px, 6px radius
+<Button variant="secondary" shape="pill" size="lg">Log in</Button>
+<Input label="Email" error={errors.email} required />  // label, error text and aria wired up
+<StatusBadge status="In Progress" />                    // ticket status → color, in one place
+```
+
+Use token classes, never hex: `bg-primary-strong`, `text-primary-ink`, `bg-tint`, `text-muted`, `bg-surface-2`, `border-border`, `rounded-card`, `shadow-card`, `font-cta`.
+
+### Change the brand color
+
+Edit the **Brand** block in `tokens.css`. Every button, badge and nav item updates. Keep these rules or text becomes hard to read:
+
+| Token | Use | Must pass |
+|---|---|---|
+| `--primary` | Bars, icons, focus ring, decoration (never text) | — |
+| `--primary-strong` | Filled buttons with white text | 4.5:1 vs white |
+| `--primary-ink` | Coral text (links, active nav, badges) | 4.5:1 vs white **and** `--tint` |
+
+### Accessibility decisions
+
+- The site's brand coral `#E84F5F` gives only **3.67:1** with white text (AA needs 4.5:1). So filled buttons use `--primary-strong` `#D43A4A` (4.66:1) and coral text uses `--primary-ink` `#B8243A` (5.30:1 on pink). The full table of checked pairs is on `/theme-preview`.
+- Success and warning text use darker shades (`#166534`, `#92400E`) because the standard green and amber fail as text.
+- Form inputs use a darker outline (`--border-strong`) so the field edge is visible (3:1 rule for controls).
+- Every interactive element shows a focus ring when using the keyboard.
+- Layouts work down to 360px; the sidebar becomes a drawer with Escape-to-close.
+- Fonts: Nunito Sans (body, headings) and Jost (buttons), substitutes for the site's licensed Avenir/Futura, loaded with `display=swap`.
+
+---
+
 ## Coming in later phases
 
 - API endpoint list

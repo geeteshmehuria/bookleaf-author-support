@@ -1,0 +1,119 @@
+/*
+ * BookLeaf design tokens — the ONLY place colors, radii, shadows and fonts are defined.
+ * Components use Tailwind classes (bg-primary-strong, text-muted, rounded-card, ...)
+ * or var(--token). Never hard-code a hex value outside this file.
+ *
+ * To change the brand color: edit the "Brand" block below. Keep the contrast rules:
+ *   --primary-strong  → filled backgrounds with white text (needs >= 4.5:1 vs white)
+ *   --primary-ink     → coral TEXT on white or --tint (needs >= 4.5:1 vs --tint)
+ *   --primary         → non-text only (bars, icons, focus ring, progress fill)
+ */
+
+:root {
+  /* ---------- Brand ---------- */
+  --primary: #E84F5F;         /* brand coral: indicators, icons, ring. NOT for white text (3.67:1) */
+  --primary-strong: #D43A4A;  /* filled buttons. White on it = 4.66:1 (AA) */
+  --primary-hover: #D12A3C;   /* hover on filled buttons. White on it = 5.11:1 */
+  --primary-ink: #B8243A;     /* coral text (links, active nav, badges). 6.27:1 on white, 5.30:1 on tint */
+  --primary-soft: #F16876;    /* decoration only, never behind text */
+  --accent: #E14656;          /* big stat numbers (large text, 4.03:1 passes 3:1) */
+  --on-primary: #FFFFFF;      /* text on --primary-strong / --primary-hover / --danger */
+
+  --tint: #F8E8EE;            /* pink backgrounds, selected rows, active nav */
+  --tint-2: #FFEDED;          /* soft section bands */
+
+  /* ---------- Text ---------- */
+  --text: #2F2E2E;            /* 13.5:1 on white */
+  --text-muted: #5E5E5E;      /* 6.5:1 on white, 5.5:1 on tint */
+  --link: #3B58B8;            /* plain text links only, 6.4:1 */
+
+  /* ---------- Surfaces & borders ---------- */
+  --surface: #FFFFFF;
+  --surface-2: #FAFAFA;       /* dashboard page background */
+  --surface-3: #F5F5F7;       /* table headers, admin sidebar */
+  --border: #E5E5E5;          /* dividers: cards, tables (decorative) */
+  --border-strong: #767676;   /* form control outlines: 4.5:1, meets 3:1 for UI controls */
+
+  /* ---------- Semantic ---------- */
+  --success: #16A34A;  --success-text: #166534;  --success-bg: #DCFCE7;
+  --warning: #D97706;  --warning-text: #92400E;  --warning-bg: #FEF3C7;
+  --danger:  #D12A3C;  --danger-text:  #B02234;  --danger-bg:  #FDE8EA;
+  --info:    #2563EB;  --info-text:    #1D4ED8;  --info-bg:    #DBEAFE;
+
+  /* Radius + shadows live in the @theme block at the bottom (same names,
+     available as var(--radius-card) etc. and as rounded-card / shadow-card). */
+
+  /* ---------- Fonts ---------- */
+  --font-body: "Nunito Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-button: "Jost", var(--font-body);
+
+  /* ---------- Misc ---------- */
+  --focus-ring: color-mix(in srgb, var(--primary) 30%, transparent);
+  --grid-line: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+/*
+ * Map tokens into Tailwind v4 (there is no tailwind.config.js in v4).
+ * "inline" makes utilities use var(--token) directly, so changing :root
+ * above updates every class.
+ */
+@theme inline {
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --color-on-primary: var(--on-primary);
+  --color-tint: var(--tint);
+  --color-tint-2: var(--tint-2);
+
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-link: var(--link);
+
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+
+  --color-success: var(--success);
+  --color-success-text: var(--success-text);
+  --color-success-bg: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-text: var(--warning-text);
+  --color-warning-bg: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-text: var(--danger-text);
+  --color-danger-bg: var(--danger-bg);
+  --color-info: var(--info);
+  --color-info-text: var(--info-text);
+  --color-info-bg: var(--info-bg);
+
+  --font-sans: var(--font-body);
+  --font-cta: var(--font-button);
+
+  /* Type scale: 12 14 16 18 20 24 32 40 (Tailwind defaults except 3xl/4xl) */
+  --text-3xl: 2rem;
+  --text-3xl--line-height: 1.25;
+  --text-4xl: 2.5rem;
+  --text-4xl--line-height: 1.2;
+}
+
+/*
+ * Radius & shadows: declared directly as Tailwind theme variables, because
+ * Tailwind uses the same --radius-* / --shadow-* names. Tailwind also outputs
+ * them on :root, so var(--radius-card) works in plain CSS too.
+ * Spacing: Tailwind's default 4px scale is used as is (p-1=4, p-2=8, p-3=12,
+ * p-4=16, p-6=24, p-8=32, p-12=48, p-16=64).
+ */
+@theme {
+  --radius-sm: 6px;
+  --radius-input: 8px;
+  --radius-card: 15px;
+  --radius-pill: 9999px;
+
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.12);
+  --shadow-pop: 0 4px 16px rgba(0, 0, 0, 0.12);
+}

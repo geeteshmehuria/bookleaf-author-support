@@ -1,1 +1,42 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
+
+@layer base {
+  html {
+    font-family: var(--font-body);
+    color: var(--text);
+    background: var(--surface-2);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    font-size: 0.875rem; /* 14px app default */
+    font-weight: 400;    /* never 300 in app screens */
+    line-height: 1.5;
+  }
+
+  h1, h2, h3, h4 {
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.25;
+  }
+
+  /* Visible keyboard focus on every interactive element (mouse clicks don't show it). */
+  :focus-visible {
+    outline: 2px solid var(--primary-strong);
+    outline-offset: 2px;
+  }
+
+  a { color: var(--primary-ink); }
+}
+
+@layer utilities {
+  /* Subtle CSS-only grid for the login background. */
+  .bg-grid {
+    background-color: var(--tint);
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+}

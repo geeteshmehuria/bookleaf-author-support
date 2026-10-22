@@ -21,7 +21,11 @@ from app.schemas.admin import (
     TicketUpdate,
 )
 from app.schemas.common import error_responses
+from app.core.errors import APIError
 from app.services import admin_tickets as svc
+from app.services.ai_classifier import classify_ticket
+from app.services.ai_drafts import DraftOut, get_or_generate
+from app.services.llm import LLMUnavailable
 from app.services.tickets import parse_ticket_id
 
 router = APIRouter(
@@ -92,6 +96,38 @@ def reply(
     assigns the ticket to the sender if nobody owns it yet."""
     ticket = svc.get_ticket(db, parse_ticket_id(ticket_id))
     return svc.to_detail(svc.add_reply(db, ticket, admin, body.body, body.is_ai_drafted))
+
+
+# --- AI ---------------------------------------------------------------------
+
+@router.get("/tickets/{ticket_id}/draft", response_model=DraftOut, responses=error_responses(404))
+def get_draft(ticket_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> DraftOut:
+    """AI-drafted reply. Made on first request, then served from the cache (no new AI call).
+    If the AI is unavailable this still returns 200 with `available: false` and a `reason`,
+    so the admin simply writes the reply by hand."""
+    ticket = svc.get_ticket(db, parse_ticket_id(ticket_id))
+    return get_or_generate(db, ticket, admin)
+
+
+@router.post("/tickets/{ticket_id}/draft", response_model=DraftOut, responses=error_responses(404))
+def regenerate_draft(ticket_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> DraftOut:
+    """Make a fresh draft (e.g. after the author wrote again, or the category was changed)."""
+    ticket = svc.get_ticket(db, parse_ticket_id(ticket_id))
+    return get_or_generate(db, ticket, admin, regenerate=True)
+
+
+@router.post("/tickets/{ticket_id}/classify", response_model=AdminTicketDetail, responses=error_responses(404, 503))
+def reclassify(ticket_id: str, admin: User = Depends(require_admin), db: Session = Depends(get_db)) -> AdminTicketDetail:
+    """Run the AI classification again and apply it (e.g. after the AI was down when the ticket came in)."""
+    ticket = svc.get_ticket(db, parse_ticket_id(ticket_id))
+    try:
+        classify_ticket(db, ticket, called_by=admin.id, admin_requested=True)
+    except LLMUnavailable as e:
+        raise APIError(503, "AI_UNAVAILABLE", f"AI classification failed: {e.reason}")
+    ticket.updated_at = svc.now()
+    db.commit()
+    db.expire_all()
+    return svc.to_detail(svc.get_ticket(db, ticket.id))
 
 
 @router.get("/team", response_model=list[PersonOut])

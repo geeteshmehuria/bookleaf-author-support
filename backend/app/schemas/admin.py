@@ -33,6 +33,9 @@ class AdminTicketRow(BaseModel):
     priority: TicketPriority
     ai_category: TicketCategory | None = Field(description="What the AI suggested; null = not classified")
     ai_priority: TicketPriority | None
+    classified_by: Literal["ai", "rules", "pending"] = Field(
+        description="ai = Gemini; rules = keyword fallback because AI was unavailable; pending = not yet"
+    )
     author: PersonOut
     book: TicketBookOut | None
     assignee: PersonOut | None

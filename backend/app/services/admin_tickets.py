@@ -28,6 +28,7 @@ from app.schemas.admin import (
 )
 from app.schemas.books import BookOut
 from app.schemas.tickets import TicketBookOut
+from app.services.ai_classifier import classified_by
 from app.services.tickets import now
 
 UNRESOLVED = (TicketStatus.OPEN, TicketStatus.IN_PROGRESS)
@@ -196,6 +197,7 @@ def to_row(t: Ticket, at: datetime | None = None) -> AdminTicketRow:
         priority=t.priority,
         ai_category=t.ai_category,
         ai_priority=t.ai_priority,
+        classified_by=classified_by(t),
         author=PersonOut.model_validate(t.author),
         book=TicketBookOut.model_validate(t.book) if t.book else None,
         assignee=PersonOut.model_validate(t.assignee) if t.assignee else None,

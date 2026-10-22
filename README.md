@@ -56,6 +56,7 @@ Every author in `data/bookleaf_sample_data.json` can log in with `Author@123`. E
 | JWT auth, bcrypt passwords | Stateless and simple; same error for wrong email or wrong password |
 | One error format: `{"error": {"code", "message"}}` | Frontend handles every error the same way; no raw 500s reach the browser |
 | AI runs after the ticket is saved | A slow or failing AI never blocks an author _(in progress)_ |
+| Queue sorted by urgency: unresolved first, then Critical → Low, then oldest; rows waiting on us over 48 h are flagged red | The brief asks for urgent and old tickets to be easy to spot; 48 h is the reply time the team promises |
 | Polling (5 s author, 10 s admin) instead of WebSockets | Simple, easy to explain, works on free hosting _(in progress)_ |
 | React + Vite + shadcn/ui | Fast to build, accessible components we own; design notes in [`frontend/DESIGN.md`](frontend/DESIGN.md) |
 
@@ -83,6 +84,12 @@ Full interactive docs: http://localhost:8000/api/v1/docs. All paths start with `
 | GET | `/tickets` | author | Their tickets, most recently updated first |
 | GET | `/tickets/{id}` | author | One ticket with its thread (never internal notes); another author's returns 404 |
 | POST | `/tickets/{id}/replies` | author | Reply on their ticket; reopens a Resolved ticket, 409 if Closed |
+| GET | `/admin/tickets` | admin | Queue. Filters: `status`, `category`, `priority` (repeatable), `assigned` (any / me / unassigned), `created_from`, `created_to`, `q`; `sort` = urgency (default), oldest, newest, updated |
+| GET | `/admin/tickets/{id}` | admin | Ticket with thread, internal notes, author profile and book data |
+| PATCH | `/admin/tickets/{id}` | admin | Change status, override category / priority (AI suggestion kept), assign / unassign |
+| POST | `/admin/tickets/{id}/notes` | admin | Internal note (never shown to the author) |
+| POST | `/admin/tickets/{id}/replies` | admin | Reply to the author; first reply moves Open → In Progress |
+| GET | `/admin/team` | admin | Admins a ticket can be assigned to |
 | GET | `/admin/summary` | admin | Ticket counts for the dashboard |
 
 Status codes: 401 not logged in or bad token, 403 wrong role, 404 not found, 422 invalid input (lists each field).

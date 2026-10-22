@@ -2,7 +2,6 @@
 -- BookLeaf Author Support & Communication Portal
 -- Production PostgreSQL Database Schema (schema.sql)
 -- Target: PostgreSQL 14+
--- Location: D:\bookleaf\schema.sql
 -- ============================================================================
 
 -- 1. Ensure required extensions in public or system space

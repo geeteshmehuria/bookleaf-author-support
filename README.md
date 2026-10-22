@@ -207,8 +207,6 @@ Open http://localhost:5173. You should see the BookLeaf Portal page with **Statu
 
 The UI matches BookLeaf Publishing's brand (coral + soft pink), adapted for dashboards: white/grey surfaces, coral only for actions, active navigation and alerts.
 
-**Preview everything:** run the frontend and open http://localhost:5173/theme-preview. It shows all colors, type sizes, components and the three layouts (login, author, admin). This page exists only in development, not in the production build.
-
 ### Where things live
 
 | File | What it holds |
@@ -245,7 +243,7 @@ Edit the **Brand** block in `tokens.css`. Every button, badge and nav item updat
 
 ### Accessibility decisions
 
-- The site's brand coral `#E84F5F` gives only **3.67:1** with white text (AA needs 4.5:1). So filled buttons use `--primary-strong` `#D43A4A` (4.66:1) and coral text uses `--primary-ink` `#B8243A` (5.30:1 on pink). The full table of checked pairs is on `/theme-preview`.
+- The site's brand coral `#E84F5F` gives only **3.67:1** with white text (AA needs 4.5:1). So filled buttons use `--primary-strong` `#D43A4A` (4.66:1) and coral text uses `--primary-ink` `#B8243A` (5.30:1 on pink). Other pairs are documented next to each token in `tokens.css`.
 - Success and warning text use darker shades (`#166534`, `#92400E`) because the standard green and amber fail as text.
 - Form inputs use a darker outline (`--border-strong`) so the field edge is visible (3:1 rule for controls).
 - Every interactive element shows a focus ring when using the keyboard.

@@ -7,20 +7,23 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 
 class Settings(BaseSettings):
+    # Fixed app constants (safe defaults)
     PROJECT_NAME: str = "BookLeaf Author Support & Communication Portal"
     API_V1_STR: str = "/api/v1"
     
+    # Required: no defaults, so the app fails fast if .env is missing them
     # Database
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/bookleaf_db"
+    DATABASE_URL: str
     
     # JWT
-    JWT_SECRET: str = "supersecretjwtkey_replace_in_production_min32chars"
+    JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     
     # AI (Gemini)
+    # Optional: empty key = AI features fall back to manual mode
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GEMINI_MODEL: str = ""
     
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"

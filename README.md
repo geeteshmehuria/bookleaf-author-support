@@ -1,261 +1,102 @@
-# BookLeaf Author Support & Communication Portal
+# BookLeaf Author Support Portal
 
-A web app that helps BookLeaf Publishing handle author support queries faster.
+Helps BookLeaf's support team answer author queries faster.
 
-- **Author portal:** authors log in, see their books and royalties, raise support tickets, and see replies.
-- **Admin portal:** the support team sees all tickets, with AI-suggested category, priority, and a draft reply.
+- **Authors** log in, see their books and royalties, raise tickets, and follow replies.
+- **Admins** work one ticket queue, with an AI-suggested category, priority and draft reply.
 
-> **Status:** work in progress, built phase by phase. Sections marked _(coming soon)_ will be filled in as each phase is finished.
+**Live demo:** _coming soon_ · **API docs:** `/api/v1/docs` (Swagger)
 
----
+> Work in progress. Sections marked _(in progress)_ are not built yet.
 
-## Tech stack
+## Run locally
 
-| Part | Tool |
-|---|---|
-| Backend | Python 3.12, FastAPI, SQLAlchemy, Pydantic |
-| Database | PostgreSQL 15 (runs in Docker) |
-| Frontend | React 19, Vite, Tailwind CSS, React Router |
-| AI | Google Gemini API |
-| Auth | JWT tokens, passwords hashed with bcrypt |
-
----
-
-## Project structure
-
-```
-bookleaf/
-├── backend/
-│   ├── app/
-│   │   ├── core/        # settings (reads .env)
-│   │   ├── routers/     # API endpoints
-│   │   ├── services/    # business logic + AI calls (coming soon)
-│   │   ├── models/      # database models (coming soon)
-│   │   ├── schemas/     # request/response validation (coming soon)
-│   │   └── main.py      # FastAPI app entry point
-│   ├── requirements.txt
-│   └── .env.example
-├── frontend/
-│   ├── src/
-│   │   ├── services/api.js   # one helper for all API calls (adds the login token)
-│   │   ├── App.jsx
-│   │   └── main.jsx
-│   ├── package.json
-│   └── .env.example
-├── data/
-│   └── bookleaf_sample_data.json   # 10 authors, 18 books (seed data)
-├── schema.sql           # database tables, created automatically by Docker
-└── docker-compose.yml   # local PostgreSQL
-```
-
----
-
-## Requirements
-
-Install these first:
-
-| Tool | Version | Check with |
-|---|---|---|
-| Python | **3.12** (3.13+ may fail to install some packages) | `python --version` |
-| Node.js | 20, 22 or 24 (LTS) | `node -v` |
-| Docker Desktop | any recent version, **must be running** | `docker info` |
-| Git | any | `git --version` |
-| uv (optional, recommended) | any | `uv --version` |
-
-You also need a **Gemini API key** (free) from [Google AI Studio](https://aistudio.google.com/apikey). The app still runs without it; AI features fall back to manual mode.
-
----
-
-## Run it locally
-
-You need **three terminals**: one for the database, one for the backend, one for the frontend.
-
-### 1. Clone the repo
+Needs Python 3.12, Node 20+, Docker Desktop (running), and optionally a free [Gemini API key](https://aistudio.google.com/apikey). Without a key the app still works; AI falls back to manual mode.
 
 ```bash
-git clone <repo-url>
-cd bookleaf
-```
-
-### 2. Start the database
-
-Make sure Docker Desktop is open and shows **Engine running**, then from the project root:
-
-```bash
+# 1. Database (Postgres in Docker; schema.sql runs on first start)
 docker compose up -d
-docker compose ps
-```
 
-The `PORTS` column must show `0.0.0.0:5432->5432/tcp`.
-
-On first start, Docker runs `schema.sql` and creates all tables inside the `app` schema. Check it:
-
-```bash
-docker compose exec db psql -U postgres -d bookleaf_db -c "\dt app.*"
-```
-
-You should see 9 tables.
-
-### 3. Start the backend
-
-```bash
+# 2. Backend  →  http://localhost:8000/api/v1/docs
 cd backend
-```
-
-Create a virtual environment with Python 3.12 and install packages.
-
-**With uv (recommended):**
-```bash
-uv venv .venv --python 3.12
-```
-
-**Without uv:**
-```bash
-python -m venv .venv          # make sure this python is 3.12
-```
-
-Activate it:
-```bash
-# Windows (PowerShell)
-.venv\Scripts\activate
-
-# macOS / Linux
-source .venv/bin/activate
-```
-
-Install packages:
-```bash
-uv pip install -r requirements.txt     # or: pip install -r requirements.txt
-```
-
-Create your env file and fill in the values:
-```bash
-# Windows
-copy .env.example .env
-
-# macOS / Linux
-cp .env.example .env
-```
-
-| Variable | What to put |
-|---|---|
-| `DATABASE_URL` | Leave as is for the Docker setup above |
-| `JWT_SECRET` | Any long random string (32+ characters) |
-| `GEMINI_API_KEY` | Your key from Google AI Studio |
-| `GEMINI_MODEL` | The current Gemini Flash model name shown in AI Studio |
-| `CORS_ORIGINS` | Leave as is for local (`http://localhost:5173`) |
-
-Run the server (**from inside `backend/`**, or Python can't find the `app` folder):
-```bash
+python -m venv .venv && .venv\Scripts\activate      # macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+copy .env.example .env                              # macOS/Linux: cp; then set JWT_SECRET and GEMINI_API_KEY
+python -m app.seed                                  # 10 authors, 18 books, 2 admins, 6 sample tickets
 uvicorn app.main:app --reload
-```
 
-Check it works:
-- Health check: http://localhost:8000/api/v1/health → `"status": "healthy"`
-- API docs (Swagger): http://localhost:8000/api/v1/docs
-
-### 4. Load the sample data _(coming soon)_
-
-A seed script will load the 10 authors and 18 books from `data/bookleaf_sample_data.json` and create test logins. Safe to run more than once.
-
-### 5. Start the frontend
-
-In a new terminal:
-```bash
+# 3. Frontend  →  http://localhost:5173
 cd frontend
-copy .env.example .env      # macOS / Linux: cp .env.example .env
-npm install
-npm run dev
+copy .env.example .env
+npm install && npm run dev
 ```
 
-Open http://localhost:5173. You should see the BookLeaf Portal page with **Status: healthy**, which means the frontend can talk to the backend.
+Tests (database must be running and seeded): `pip install -r requirements-dev.txt` then `pytest -q` in `backend/`.
 
----
-
-## Test logins _(coming soon)_
+## Test logins
 
 | Role | Email | Password |
 |---|---|---|
-| Author | _added after the seed phase_ | |
-| Admin | _added after the seed phase_ | |
+| Admin | `neha.admin@bookleaf.example.com` | `Admin@123` |
+| Admin | `karan.admin@bookleaf.example.com` | `Admin@123` |
+| Author | `sneha.kulkarni@email.com` (has a book in production) | `Author@123` |
+| Author | `ananya.reddy@email.com` (royalty never paid) | `Author@123` |
+| Author | `priya.sharma@email.com` (normal published books) | `Author@123` |
 
----
+Every author in `data/bookleaf_sample_data.json` can log in with `Author@123`. Everyone uses the same login page; the role returned by the API decides where they land.
 
-## Common problems
+## Architecture decisions
 
-| Problem | Cause | Fix |
-|---|---|---|
-| `ModuleNotFoundError: No module named 'app'` | `uvicorn` was run from the wrong folder | `cd backend` first |
-| `failed to connect to the docker API ... dockerDesktopLinuxEngine` | Docker Desktop is not running | Open Docker Desktop, wait for "Engine running" |
-| `Bind for 0.0.0.0:5432 failed: port is already allocated` | Another Postgres (Docker or Windows) is using port 5432 | Stop it, or change `"5432:5432"` to `"5433:5432"` in `docker-compose.yml` and `localhost:5433` in `backend/.env` |
-| `PORTS` shows only `5432/tcp` | Container was created during a failed start | `docker compose down` then `docker compose up -d` |
-| Tables missing after editing `schema.sql` | Docker runs `schema.sql` only when the database is first created | `docker compose down -v` (**deletes all DB data**) then `docker compose up -d` |
-| Package install fails | Python is 3.13 or newer | Recreate `.venv` with Python 3.12 |
-| Frontend shows "Error connecting to API" | Backend is not running, or wrong `VITE_API_URL` | Start uvicorn; check `frontend/.env` |
-| Port 8000 already in use | Another app is on 8000 | Stop it, or run `uvicorn app.main:app --reload --port 8001` and update `VITE_API_URL` |
-
----
-
-## Security notes
-
-- `.env` files are in `.gitignore` and are **never** committed. Only `.env.example` files are in the repo.
-- The Gemini API key is used **only by the backend**. It is never sent to the browser.
-
----
-
-## Design system
-
-The UI matches BookLeaf Publishing's brand (coral + soft pink), adapted for dashboards: white/grey surfaces, coral only for actions, active navigation and alerts.
-
-### Where things live
-
-| File | What it holds |
+| Decision | Why |
 |---|---|
-| `frontend/src/styles/tokens.css` | **All** colors, radii, shadows and fonts (the only file with hex values) and their mapping into Tailwind |
-| `frontend/src/index.css` | Base styles: 14px body, bold headings, visible keyboard focus |
-| `frontend/src/components/ui/` | Button, Input, Textarea, Select, Checkbox, Card, Badge (+ StatusBadge, PriorityBadge), StatCard, Table, Alert, Toast |
-| `frontend/src/components/layout/` | `AuthLayout` (login screen), `AppShell` (sidebar + top bar, drawer on mobile) |
+| FastAPI + Pydantic | Input validation and Swagger docs come built in |
+| PostgreSQL, `schema.sql` as the single source of truth | Rules live in the database too: royalty paid + pending = earned, and a ticket's book must belong to its author |
+| One `users` table with a role (author / admin) | One login flow; the role is read from the database on every request, never trusted from the token |
+| Author data filtered by the token, never by an ID from the request | An author can't see someone else's books by editing the URL |
+| JWT auth, bcrypt passwords | Stateless and simple; same error for wrong email or wrong password |
+| One error format: `{"error": {"code", "message"}}` | Frontend handles every error the same way; no raw 500s reach the browser |
+| AI runs after the ticket is saved | A slow or failing AI never blocks an author _(in progress)_ |
+| Polling (5 s author, 10 s admin) instead of WebSockets | Simple, easy to explain, works on free hosting _(in progress)_ |
+| React + Vite + shadcn/ui | Fast to build, accessible components we own; design notes in [`frontend/DESIGN.md`](frontend/DESIGN.md) |
 
-Tailwind v4 has no `tailwind.config.js`; the theme is set with `@theme` in `tokens.css`.
+## AI integration _(in progress)_
 
-### Using it
+- **Model:** Google Gemini Flash. Free tier, fast, and it can return strict JSON. The model name is set in `.env`, so it can change without code changes.
+- **Classification:** one call per new ticket returns `{category, priority, reasoning}`. The output is checked against the 6 allowed categories; anything invalid falls back to General Inquiry / Medium.
+- **Draft reply:** generated when an admin opens a ticket, then cached in `ticket_drafts` (a Regenerate button makes a new one).
+- **Saving tokens:** each call sends only the knowledge-base section for that ticket's category, the one relevant book record, and the last 2–3 messages. Never the whole knowledge base or full history.
+- **When AI fails** (down, rate-limited, bad key): the ticket is still created, a keyword rule picks the category, and the admin sees "AI unavailable" with a working manual reply box.
+- **Security:** the key lives only in backend environment variables and is never sent to the browser. Prompts include no author email or phone number.
 
-```jsx
-import { Button, Card, Input, StatusBadge, useToast } from '../components/ui'
+## API
 
-<Button>Save</Button>                                   // primary, 40px, 6px radius
-<Button variant="secondary" shape="pill" size="lg">Log in</Button>
-<Input label="Email" error={errors.email} required />  // label, error text and aria wired up
-<StatusBadge status="In Progress" />                    // ticket status → color, in one place
-```
+Full interactive docs: http://localhost:8000/api/v1/docs. All paths start with `/api/v1`. Send `Authorization: Bearer <token>`.
 
-Use token classes, never hex: `bg-primary-strong`, `text-primary-ink`, `bg-tint`, `text-muted`, `bg-surface-2`, `border-border`, `rounded-card`, `shadow-card`, `font-cta`.
+| Method | Path | Who | Purpose |
+|---|---|---|---|
+| GET | `/health` | anyone | Server is up |
+| POST | `/auth/login` | anyone | Email + password → token and user (with role) |
+| GET | `/auth/me` | logged in | Current user |
+| GET | `/books` | author | The logged-in author's books (in production first, then newest) |
+| GET | `/books/{id}` | author | One of their books; another author's book returns 404 |
+| GET | `/admin/summary` | admin | Ticket counts for the dashboard |
 
-### Change the brand color
+Status codes: 401 not logged in or bad token, 403 wrong role, 404 not found, 422 invalid input (lists each field).
 
-Edit the **Brand** block in `tokens.css`. Every button, badge and nav item updates. Keep these rules or text becomes hard to read:
+## Known limitations
 
-| Token | Use | Must pass |
-|---|---|---|
-| `--primary` | Bars, icons, focus ring, decoration (never text) | — |
-| `--primary-strong` | Filled buttons with white text | 4.5:1 vs white |
-| `--primary-ink` | Coral text (links, active nav, badges) | 4.5:1 vs white **and** `--tint` |
+- No rate limit on login, and tokens can't be revoked before they expire (24 h).
+- Login token is kept in `localStorage`; an httpOnly cookie would be safer.
+- File attachments are UI only.
+- Polling instead of WebSockets.
+- Gemini free tier: low daily limits, and Google may use the data sent to it. Use a paid tier in production.
+- Sample royalty data uses a flat amount per copy, not the 80/20 net-profit formula from the policy; the app shows the stored figures as they are.
 
-### Accessibility decisions
+## Troubleshooting
 
-- The site's brand coral `#E84F5F` gives only **3.67:1** with white text (AA needs 4.5:1). So filled buttons use `--primary-strong` `#D43A4A` (4.66:1) and coral text uses `--primary-ink` `#B8243A` (5.30:1 on pink). Other pairs are documented next to each token in `tokens.css`.
-- Success and warning text use darker shades (`#166534`, `#92400E`) because the standard green and amber fail as text.
-- Form inputs use a darker outline (`--border-strong`) so the field edge is visible (3:1 rule for controls).
-- Every interactive element shows a focus ring when using the keyboard.
-- Layouts work down to 360px; the sidebar becomes a drawer with Escape-to-close.
-- Fonts: Nunito Sans (body, headings) and Jost (buttons), substitutes for the site's licensed Avenir/Futura, loaded with `display=swap`.
-
----
-
-## Coming in later phases
-
-- API endpoint list
-- Architecture decisions and reasons
-- How the AI works (prompts, saving tokens, what happens when AI is down)
-- Live demo link
-- Known limitations and future improvements
+| Problem | Fix |
+|---|---|
+| Seed fails on `author_royalty_per_copy` | Old database: `docker compose down -v`, `docker compose up -d`, seed again |
+| Port 5432 already in use | Another Postgres is running; stop it, or map `5433:5432` and update `backend/.env` |
+| `No module named 'app'` | Run `uvicorn` from inside `backend/` |
+| Login works but passwords don't match | `python -m app.seed --reset-passwords` |

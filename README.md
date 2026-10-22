@@ -55,6 +55,8 @@ Every author in `data/bookleaf_sample_data.json` can log in with `Author@123`. E
 | Author data filtered by the token, never by an ID from the request | An author can't see someone else's books by editing the URL |
 | JWT auth, bcrypt passwords | Stateless and simple; same error for wrong email or wrong password |
 | One error format: `{"error": {"code", "message"}}` | Frontend handles every error the same way; no raw 500s reach the browser |
+| One database transaction per request (`get_db`, `scope="function"`) | A request's changes are saved together or not at all; the commit finishes before the response, so a failed commit is a 500, never a false success. AI calls run with no transaction open |
+| Every API request logged in `request_logs` (except browser CORS checks and `/health`) | Full audit trail: who called what, status, time taken; passwords and tokens masked, response bodies never stored, written in its own transaction so failed requests are still logged |
 | AI runs after the ticket is saved | A slow or failing AI never blocks an author |
 | Queue sorted by urgency: unresolved first, then Critical → Low, then oldest; rows waiting on us over 48 h are flagged red | The brief asks for urgent and old tickets to be easy to spot; 48 h is the reply time the team promises |
 | Polling (5 s author, 10 s admin) instead of WebSockets | Simple, easy to explain, works on free hosting. Pauses while the tab is hidden; a refresh never overwrites a newer local change (`hooks/use-api.js`) |
@@ -142,6 +144,7 @@ Rate-limit counts are kept in memory, which suits the single server this runs on
 ## Known limitations
 
 - Tokens can't be revoked before they expire (24 h); rate-limit counters reset when the server restarts.
+- `request_logs` grows with polling (~12 rows a minute per open tab) and has no automatic clean-up yet; production would delete rows older than 30-90 days on a schedule.
 - Login token is kept in `localStorage`; an httpOnly cookie would be safer.
 - File attachments are UI only (the form shows the chosen file names; nothing is uploaded).
 - Polling instead of WebSockets.

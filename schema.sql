@@ -80,7 +80,8 @@ CREATE INDEX idx_users_role_id ON app.users(role_id);
 
 -- ============================================================================
 -- 3. BOOKS TABLE
--- Accommodates published books and in-production books (BK013, BK015)
+-- Accommodates published books and in-production books (BK013, BK015):
+-- publication_date, mrp, author_royalty_per_copy and print_partner are NULL for those
 -- Multi-column UNIQUE constraint (id, author_id) allows composite FK from tickets
 -- Consistency check: royalty_paid + royalty_pending must equal total_royalty_earned
 -- ============================================================================
@@ -93,7 +94,7 @@ CREATE TABLE app.books (
     publication_date DATE,                       -- Nullable for books in production
     status TEXT NOT NULL,                        -- e.g. 'Published & Live', 'In Production - Cover Design'
     mrp NUMERIC(10, 2) CHECK (mrp IS NULL OR mrp >= 0),
-    author_royalty_per_copy NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (author_royalty_per_copy >= 0),
+    author_royalty_per_copy NUMERIC(10, 2) CHECK (author_royalty_per_copy IS NULL OR author_royalty_per_copy >= 0), -- NULL for in-production books
     total_copies_sold INT NOT NULL DEFAULT 0 CHECK (total_copies_sold >= 0),
     total_royalty_earned NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (total_royalty_earned >= 0),
     royalty_paid NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (royalty_paid >= 0),

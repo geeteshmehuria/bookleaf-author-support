@@ -150,7 +150,10 @@ export default function TicketView() {
   const { ticketId } = useParams()
   const { state } = useLocation()
   const { user } = useAuth()
-  const { data: ticket, error, loading, reload, setData } = useApi(`/admin/tickets/${encodeURIComponent(ticketId)}`)
+  // Refreshes every 10 s so a new message from the author appears while the admin has the ticket open.
+  const { data: ticket, error, loading, reload, setData } = useApi(`/admin/tickets/${encodeURIComponent(ticketId)}`, {
+    pollMs: 10000,
+  })
   const { data: team } = useApi("/admin/team")
   const [saving, setSaving] = useState(false)
   // fromDraft: the admin started from the AI draft (stays true if they edit it), stored as is_ai_drafted

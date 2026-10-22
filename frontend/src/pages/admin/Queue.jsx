@@ -71,7 +71,7 @@ function FilterSelect({ id, label, value, onChange, options }) {
 }
 
 function Summary() {
-  const { data } = useApi("/admin/summary")
+  const { data } = useApi("/admin/summary", { pollMs: 10000 })
   const cards = [
     ["Open", data?.by_status.Open, Inbox, "?status=Open"],
     ["Critical / High open", data && data.unresolved_by_priority.Critical + data.unresolved_by_priority.High, AlertTriangle, "?"],
@@ -93,7 +93,8 @@ export default function Queue() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const { data, error, loading, reload } = useApi(`/admin/tickets?${toApiQuery(params)}`)
+  // Refreshes every 10 s so new tickets and author replies appear on their own.
+  const { data, error, loading, reload } = useApi(`/admin/tickets?${toApiQuery(params)}`, { pollMs: 10000 })
 
   const get = (key) => params.get(key) ?? DEFAULTS[key] ?? ""
   const setParam = (key, value) => {

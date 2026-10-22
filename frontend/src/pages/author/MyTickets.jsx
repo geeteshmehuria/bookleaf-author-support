@@ -18,7 +18,8 @@ function NewQueryButton() {
 }
 
 export default function MyTickets() {
-  const { data: tickets, error, loading, reload } = useApi("/tickets")
+  // Refreshes every 5 s: status changes and new replies show up without reloading.
+  const { data: tickets, error, loading, reload } = useApi("/tickets", { pollMs: 5000 })
 
   if (loading) return <LoadingCards count={3} label="Loading your queries" />
   if (error) return <ErrorState error={error} onRetry={reload} title="Couldn't load your queries" />

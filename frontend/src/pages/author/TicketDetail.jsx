@@ -40,10 +40,10 @@ function Message({ who, when, from_support, children }) {
 
 export default function TicketDetail() {
   const { ticketId } = useParams()
-  const { data, error, loading, reload } = useApi(`/tickets/${encodeURIComponent(ticketId)}`)
-  // The reply call returns the updated ticket; show that instead of reloading.
-  const [updated, setUpdated] = useState(null)
-  const ticket = updated?.id === ticketId ? updated : data
+  // Refreshes every 5 s, so a reply from BookLeaf appears without reloading the page.
+  const { data: ticket, error, loading, reload, setData } = useApi(`/tickets/${encodeURIComponent(ticketId)}`, {
+    pollMs: 5000,
+  })
 
   const [reply, setReply] = useState("")
   const [replyError, setReplyError] = useState("")
@@ -67,15 +67,11 @@ export default function TicketDetail() {
     setSending(true)
     setReplyError("")
     try {
-      setUpdated(await api.post(`/tickets/${ticket.id}/replies`, { body: reply.trim() }))
+      setData(await api.post(`/tickets/${ticket.id}/replies`, { body: reply.trim() }))
       setReply("")
     } catch (err) {
       setReplyError(err.message)
-      if (err.code === "TICKET_CLOSED") {
-        // Drop the copy from an earlier reply, or it would hide the fresh (closed) ticket.
-        setUpdated(null)
-        reload()
-      }
+      if (err.code === "TICKET_CLOSED") reload()
     } finally {
       setSending(false)
     }

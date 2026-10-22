@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { Link, useLocation, useParams } from "react-router-dom"
-import { AlertTriangle, ArrowLeft, Lock, Sparkles } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Lock, RefreshCw, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { BookStatusBadge } from "@/components/books/BookCard"
+import { AiDraftPanel } from "@/components/tickets/AiDraftPanel"
 import { EmptyState, ErrorState, LoadingCards } from "@/components/feedback"
 import { PriorityBadge } from "@/components/tickets/PriorityBadge"
 import { TicketStatusBadge } from "@/components/tickets/TicketStatusBadge"
@@ -47,8 +48,10 @@ function Message({ who, when, tone, tag, children }) {
   )
 }
 
-function ComposeBox({ label, helper, placeholder, submitLabel, onSubmit, extraAction }) {
-  const [text, setText] = useState("")
+function ComposeBox({ label, helper, placeholder, submitLabel, onSubmit, extraAction, text: outerText, onTextChange }) {
+  const [ownText, setOwnText] = useState("")
+  const text = outerText ?? ownText
+  const setText = onTextChange ?? setOwnText
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
 
@@ -122,9 +125,9 @@ function SideSelect({ id, label, value, options, onChange, disabled, helper }) {
   )
 }
 
-/** "AI suggested: High" / "Changed from AI: High" / "Not classified by AI yet" */
-function aiHelper(current, suggested) {
-  if (!suggested) return "Not classified by AI yet"
+/** "AI suggested: High" / "Overridden. AI suggested: High" / "Set by keyword rules" */
+function aiHelper(current, suggested, source) {
+  if (!suggested) return source === "rules" ? "Set by keyword rules (AI was unavailable)" : "Not classified by AI yet"
   return current === suggested ? `AI suggested: ${suggested}` : `Overridden. AI suggested: ${suggested}`
 }
 
@@ -150,6 +153,9 @@ export default function TicketView() {
   const { data: ticket, error, loading, reload, setData } = useApi(`/admin/tickets/${encodeURIComponent(ticketId)}`)
   const { data: team } = useApi("/admin/team")
   const [saving, setSaving] = useState(false)
+  // fromDraft: the admin started from the AI draft (stays true if they edit it), stored as is_ai_drafted
+  const [reply, setReply] = useState({ text: "", fromDraft: false })
+  const setReplyText = (text) => setReply((r) => ({ text, fromDraft: text ? r.fromDraft : false }))
 
   const backTo = `/admin${state?.from ?? ""}`
   const back = (
@@ -187,13 +193,25 @@ export default function TicketView() {
   async function sendReply(body, resolveAfter) {
     // Show the reply as soon as it's saved. If resolving then fails, don't throw:
     // the compose box would keep the text and invite sending the same reply twice.
-    setData(await api.post(`/admin/tickets/${ticket.id}/replies`, { body, is_ai_drafted: false }))
+    setData(await api.post(`/admin/tickets/${ticket.id}/replies`, { body, is_ai_drafted: reply.fromDraft }))
     if (!resolveAfter) return toast.success("Reply sent to the author")
     try {
       setData(await api.patch(`/admin/tickets/${ticket.id}`, { status: "Resolved" }))
       toast.success("Reply sent and ticket resolved")
     } catch (err) {
       toast.error(`Reply sent, but the ticket couldn't be resolved: ${err.message}`)
+    }
+  }
+
+  async function reclassify() {
+    setSaving(true)
+    try {
+      setData(await api.post(`/admin/tickets/${ticket.id}/classify`))
+      toast.success("Classified by AI")
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -258,9 +276,20 @@ export default function TicketView() {
             </ol>
           </section>
 
-          <Card className="gap-3">
+          <AiDraftPanel
+            key={ticket.id}
+            ticketId={ticket.id}
+            onUse={(text) => {
+              setReply({ text, fromDraft: true })
+              document.getElementById("reply-box")?.scrollIntoView({ behavior: "smooth", block: "center" })
+            }}
+          />
+
+          <Card className="gap-3" id="reply-box">
             <ComposeBox
-              label="Reply to the author"
+              text={reply.text}
+              onTextChange={setReplyText}
+              label={reply.fromDraft ? "Reply to the author (from AI draft, edit freely)" : "Reply to the author"}
               helper="The author sees this in their ticket. Sending moves an Open ticket to In Progress."
               submitLabel="Send reply"
               extraAction={ticket.status !== "Resolved" && ticket.status !== "Closed" ? { label: "Send & resolve", value: true } : null}
@@ -305,7 +334,7 @@ export default function TicketView() {
               label="Category"
               value={ticket.category}
               disabled={saving}
-              helper={aiHelper(ticket.category, ticket.ai_category)}
+              helper={aiHelper(ticket.category, ticket.ai_category, ticket.classified_by)}
               options={CATEGORIES.map((c) => [c, c])}
               onChange={(v) => update({ category: v }, `Category set to ${v}`)}
             />
@@ -314,7 +343,7 @@ export default function TicketView() {
               label="Priority"
               value={ticket.priority}
               disabled={saving}
-              helper={aiHelper(ticket.priority, ticket.ai_priority)}
+              helper={aiHelper(ticket.priority, ticket.ai_priority, ticket.classified_by)}
               options={PRIORITIES.map((p) => [p, p])}
               onChange={(v) => update({ priority: v }, `Priority set to ${v}`)}
             />
@@ -335,9 +364,14 @@ export default function TicketView() {
             </div>
             {ticket.ai_reasoning && (
               <p className="rounded-md bg-surface-3 p-3 text-xs text-muted-foreground">
-                <span className="font-semibold">AI reasoning: </span>
+                <span className="font-semibold">{ticket.classified_by === "ai" ? "AI reasoning: " : "Why: "}</span>
                 {ticket.ai_reasoning}
               </p>
+            )}
+            {ticket.classified_by !== "ai" && (
+              <Button size="sm" variant="secondary" className="w-fit" disabled={saving} onClick={reclassify}>
+                <RefreshCw aria-hidden="true" /> Classify with AI
+              </Button>
             )}
           </Card>
 

@@ -258,7 +258,11 @@ export default function Queue() {
                     </TableCell>
                     <TableCell className="text-sm">
                       {t.category}
-                      {t.ai_category === null && <span className="block text-xs text-muted-foreground">Not AI-classified</span>}
+                      {t.classified_by !== "ai" && (
+                        <span className="block text-xs text-muted-foreground">
+                          {t.classified_by === "rules" ? "Keyword rules (AI unavailable)" : "Classifying…"}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <PriorityBadge priority={t.priority} />

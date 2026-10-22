@@ -26,3 +26,35 @@ export function formatDate(iso) {
   const [y, m, d] = iso.split("-").map(Number)
   return new Date(y, m - 1, d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
 }
+
+const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
+const STEPS = [
+  ["year", 365 * 24 * 3600],
+  ["month", 30 * 24 * 3600],
+  ["week", 7 * 24 * 3600],
+  ["day", 24 * 3600],
+  ["hour", 3600],
+  ["minute", 60],
+]
+
+/** ISO timestamp -> "5 minutes ago", "yesterday", "2 weeks ago"; under a minute -> "just now" */
+export function formatRelative(isoTimestamp, now = Date.now()) {
+  if (!isoTimestamp) return DASH
+  const seconds = Math.round((new Date(isoTimestamp).getTime() - now) / 1000)
+  for (const [unit, size] of STEPS) {
+    if (Math.abs(seconds) >= size) return rtf.format(Math.round(seconds / size), unit)
+  }
+  return "just now"
+}
+
+/** ISO timestamp -> "23 Oct 2026, 4:05 pm" (for tooltips and message times) */
+export function formatDateTime(isoTimestamp) {
+  if (!isoTimestamp) return DASH
+  return new Date(isoTimestamp).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}

@@ -51,7 +51,7 @@ export default function BookDetail() {
       </Card>
 
       <Button asChild shape="pill" className="w-fit">
-        <Link to={`/author/support?book=${book.id}`}>
+        <Link to={`/author/support/new?book=${book.id}`}>
           <LifeBuoy aria-hidden="true" /> Ask about this book
         </Link>
       </Button>

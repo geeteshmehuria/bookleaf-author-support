@@ -1,8 +1,13 @@
-from fastapi import FastAPI, Request
+import logging
+
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+
 from app.core.config import settings
-from app.routers import health
+from app.core.errors import register_error_handlers
+from app.routers import admin, auth, health
+
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -10,6 +15,10 @@ app = FastAPI(
     docs_url=f"{settings.API_V1_STR}/docs",
     redoc_url=f"{settings.API_V1_STR}/redoc",
 )
+
+# Error handlers first: their catch-all middleware must sit INSIDE CORS
+# (middleware added later wraps middleware added earlier).
+register_error_handlers(app)
 
 # CORS Configuration
 app.add_middleware(
@@ -22,6 +31,9 @@ app.add_middleware(
 
 # Include Routers
 app.include_router(health.router, prefix=settings.API_V1_STR)
+app.include_router(auth.router, prefix=settings.API_V1_STR)
+app.include_router(admin.router, prefix=settings.API_V1_STR)
+
 
 @app.get("/")
 async def root():

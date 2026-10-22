@@ -1,10 +1,12 @@
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+# The old .env.example value. It is public in git history, so it must never sign tokens in production.
+EXAMPLE_JWT_SECRET = "supersecretjwtkey_replace_in_production_min32chars"
 
 class Settings(BaseSettings):
     # Fixed app constants (safe defaults)
@@ -42,6 +44,13 @@ class Settings(BaseSettings):
         if len(v) < 32:
             raise ValueError("JWT_SECRET must be at least 32 characters")
         return v
+
+    @model_validator(mode="after")
+    def no_example_secret_in_production(self):
+        # With the public example value anyone could sign an admin token.
+        if self.ENVIRONMENT == "production" and self.JWT_SECRET == EXAMPLE_JWT_SECRET:
+            raise ValueError("JWT_SECRET is still the old example value. Set a real secret in production")
+        return self
 
     @property
     def ai_enabled(self) -> bool:

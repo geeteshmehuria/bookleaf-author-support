@@ -79,6 +79,10 @@ Full interactive docs: http://localhost:8000/api/v1/docs. All paths start with `
 | GET | `/auth/me` | logged in | Current user |
 | GET | `/books` | author | The logged-in author's books (in production first, then newest) |
 | GET | `/books/{id}` | author | One of their books; another author's book returns 404 |
+| POST | `/tickets` | author | Raise a query (`book_id: null` = General / Account level) |
+| GET | `/tickets` | author | Their tickets, most recently updated first |
+| GET | `/tickets/{id}` | author | One ticket with its thread (never internal notes); another author's returns 404 |
+| POST | `/tickets/{id}/replies` | author | Reply on their ticket; reopens a Resolved ticket, 409 if Closed |
 | GET | `/admin/summary` | admin | Ticket counts for the dashboard |
 
 Status codes: 401 not logged in or bad token, 403 wrong role, 404 not found, 422 invalid input (lists each field).
@@ -87,7 +91,7 @@ Status codes: 401 not logged in or bad token, 403 wrong role, 404 not found, 422
 
 - No rate limit on login, and tokens can't be revoked before they expire (24 h).
 - Login token is kept in `localStorage`; an httpOnly cookie would be safer.
-- File attachments are UI only.
+- File attachments are UI only (the form shows the chosen file names; nothing is uploaded).
 - Polling instead of WebSockets.
 - Gemini free tier: low daily limits, and Google may use the data sent to it. Use a paid tier in production.
 - Sample royalty data uses a flat amount per copy, not the 80/20 net-profit formula from the policy; the app shows the stored figures as they are.

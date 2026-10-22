@@ -2,6 +2,10 @@ import os
 from pydantic_settings import BaseSettings
 from typing import List
 
+from pathlib import Path
+
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "BookLeaf Author Support & Communication Portal"
     API_V1_STR: str = "/api/v1"
@@ -30,7 +34,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
     class Config:
-        env_file = ".env"
+        env_file = (str(BACKEND_DIR / ".env"), ".env")
         env_file_encoding = "utf-8"
         extra = "ignore"
 

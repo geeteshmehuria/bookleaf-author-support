@@ -3,14 +3,16 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
-import { ToastProvider } from './components/ui'
+import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
-      <ToastProvider>
+      <TooltipProvider>
         <App />
-      </ToastProvider>
+        <Toaster position="top-right" />
+      </TooltipProvider>
     </BrowserRouter>
   </StrictMode>,
 )

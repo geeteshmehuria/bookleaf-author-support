@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
-import { api } from '../services/api'
-import { AuthLayout } from '../components/layout/AuthLayout'
-import { Alert } from '../components/ui'
+import { useEffect, useState } from "react"
+import { api } from "@/services/api"
+import { LoginLayout } from "@/components/layout/LoginLayout"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Skeleton } from "@/components/ui/skeleton"
 
 /** Phase 0 check: proves the frontend can reach the backend. */
 export default function HealthCheck() {
@@ -9,18 +10,31 @@ export default function HealthCheck() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    api.get('/health').then(setHealth).catch((err) => setError(err.message))
+    api.get("/health").then(setHealth).catch((err) => setError(err.message))
   }, [])
 
   return (
-    <AuthLayout title="BookLeaf Portal" subtitle="Author Support & Communication">
-      {!health && !error && <p className="text-center text-muted">Checking backend API…</p>}
-      {error && <Alert variant="danger" title="Cannot reach the API">{error}</Alert>}
-      {health && (
-        <Alert variant="success" title={`Status: ${health.status}`}>
-          {health.service} · {new Date(health.timestamp).toLocaleString()}
+    <LoginLayout title="BookLeaf Portal" subtitle="Author Support & Communication">
+      {!health && !error && (
+        <div className="grid gap-2" aria-busy="true" aria-label="Checking backend API">
+          <Skeleton className="h-5 w-1/2" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
+      )}
+      {error && (
+        <Alert variant="danger">
+          <AlertTitle>Cannot reach the API</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
-    </AuthLayout>
+      {health && (
+        <Alert variant="success">
+          <AlertTitle>Status: {health.status}</AlertTitle>
+          <AlertDescription>
+            {health.service} · {new Date(health.timestamp).toLocaleString()}
+          </AlertDescription>
+        </Alert>
+      )}
+    </LoginLayout>
   )
 }

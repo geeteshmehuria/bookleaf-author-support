@@ -1,6 +1,10 @@
 import { lazy, Suspense } from "react"
-import { Route, Routes } from "react-router-dom"
+import { Navigate, Route, Routes } from "react-router-dom"
+import { RequireRole } from "@/components/auth/RequireRole"
 import HealthCheck from "@/pages/HealthCheck"
+import Login from "@/pages/Login"
+import AuthorArea from "@/pages/author/AuthorArea"
+import AdminDemo from "@/pages/AdminDemo"
 
 // Dev-only styleguide: the import is dropped from production builds.
 const ThemePreview = import.meta.env.DEV ? lazy(() => import("@/pages/ThemePreview")) : null
@@ -8,7 +12,28 @@ const ThemePreview = import.meta.env.DEV ? lazy(() => import("@/pages/ThemePrevi
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<HealthCheck />} />
+      {/* One login for everyone; the API's role decides where they go next */}
+      <Route path="/" element={<Login />} />
+
+      <Route
+        path="/author/*"
+        element={
+          <RequireRole role="author">
+            <AuthorArea />
+          </RequireRole>
+        }
+      />
+      <Route
+        path="/admin/*"
+        element={
+          <RequireRole role="admin">
+            <AdminDemo />
+          </RequireRole>
+        }
+      />
+
+      {/* Backend connection check (handy after deploy) */}
+      <Route path="/health" element={<HealthCheck />} />
 
       {ThemePreview && (
         <Route
@@ -20,6 +45,9 @@ export default function App() {
           }
         />
       )}
+
+      {/* Old login URLs and anything unknown go to the login page */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.core.errors import register_error_handlers
+from app.core.middleware import register_security_middleware
 from app.routers import admin, auth, books, health, tickets
 
 logging.basicConfig(level=logging.INFO)
@@ -19,14 +20,15 @@ app = FastAPI(
 # Error handlers first: their catch-all middleware must sit INSIDE CORS
 # (middleware added later wraps middleware added earlier).
 register_error_handlers(app)
+register_security_middleware(app)
 
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,  # we send a Bearer token header, never cookies
+    allow_methods=["GET", "POST", "PATCH"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Include Routers

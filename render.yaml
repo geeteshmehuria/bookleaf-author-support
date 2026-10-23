@@ -1,4 +1,4 @@
-# Render Blueprint for the API. The database is on Neon and the frontend on Vercel (see README > Deploy).
+# Render Blueprint for the API. The database is on Neon and the frontend on Vercel (see docs/OPERATIONS.md > Deploy).
 # Render dashboard -> New -> Blueprint -> pick this repo. Then fill the "sync: false" values.
 services:
   - type: web
@@ -9,7 +9,7 @@ services:
     buildCommand: pip install -r requirements.txt
     # The seed is idempotent: creates the schema on an empty database, upserts the 10 authors
     # and 18 books from data/bookleaf_sample_data.json, and never overwrites tickets.
-    # --forwarded-allow-ips='*' so rate limits see the visitor's IP (see README, Security).
+    # --forwarded-allow-ips='*' so rate limits see the visitor's IP (see docs/OPERATIONS.md, Security).
     startCommand: python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
     healthCheckPath: /api/v1/health
     envVars:

@@ -81,7 +81,7 @@ def _human(seconds: int) -> str:
 
 def client_ip(request: Request) -> str:
     """The caller's IP. Behind Render's proxy this is only correct when uvicorn runs with
-    --proxy-headers --forwarded-allow-ips='*' (it then reads X-Forwarded-For); see README > Security."""
+    --proxy-headers --forwarded-allow-ips='*' (it then reads X-Forwarded-For); see docs/OPERATIONS.md > Security."""
     return request.client.host if request.client else "unknown"
 
 

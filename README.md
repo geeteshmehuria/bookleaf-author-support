@@ -180,16 +180,18 @@ All paths start with `/api/v1`. Send `Authorization: Bearer <token>`.
 
 ## Deploy
 
-`render.yaml` creates the database, API and frontend on [Render](https://render.com) (free plans).
+`render.yaml` creates the database, API and frontend on [Render](https://render.com) (free plans, Singapore region).
 
-1. Render → **New → Blueprint** → pick this repo.
-2. Fill in:
-   - `bookleaf-api`: `CORS_ORIGINS` = frontend URL, plus `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_CLASSIFY_MODEL`
-   - `bookleaf-web`: `VITE_API_URL` = API URL + `/api/v1`
-3. Deploy. The API seeds the sample data on start; `JWT_SECRET` is generated.
-4. Put both URLs at the top of this README.
+1. Push `main` to GitHub. Render → **New → Blueprint** → pick this repo.
+2. Render asks for the `sync: false` values:
+   - `bookleaf-api`: `CORS_ORIGINS` = `https://bookleaf-web.onrender.com` (no trailing slash), `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_CLASSIFY_MODEL`
+   - `bookleaf-web`: `VITE_API_URL` = `https://bookleaf-api.onrender.com/api/v1`
+3. **Apply.** The API creates the tables and seeds the sample data on start; `JWT_SECRET` is generated.
+4. Check the real URLs on each service page. If Render added a suffix (name already taken), fix the two values above and redeploy `bookleaf-web` (the API URL is baked in at build time).
+5. Test: open `<API URL>/api/v1/health`, then log in as an author and an admin.
+6. Put both URLs at the top of this README.
 
-Note: the free API sleeps after 15 min idle (first request takes ~1 min).
+Free plan notes: the API sleeps after 15 min idle (first request takes ~1 min); the free database expires 30 days after creation.
 
 ## Known limitations
 

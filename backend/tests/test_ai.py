@@ -333,3 +333,40 @@ def test_google_reason_is_shown_to_admin(tok, fake):
     assert r["available"] is False
     assert "503 UNAVAILABLE: The model is overloaded" in r["reason"]
     assert logs_for(t["id"])[-1].error_message == r["reason"]
+
+
+# --- Context for specific replies ----------------------------------------------
+
+def test_account_level_royalty_draft_gets_every_book(tok, fake):
+    # General / Account level: no book picked, but the reply must still quote real numbers.
+    fake.replies = ['{"category": "Royalty & Payments", "priority": "High", "reasoning": "x"}', "draft"]
+    t = new_ticket(tok, who="sneha", book_id=None, subject="Where are my royalties?",
+                   description="I have not received my royalty for a long time across my books. Please check.")
+    classify_prompt = fake.calls[0][1]
+    assert "Total royalty pending: Rs 7,865" in classify_prompt and "Algorithm of Love" not in classify_prompt
+    client.get(f"{API}/admin/tickets/{t['id']}/draft", headers=bearer(tok["admin"]))
+    user = fake.calls[1][1]
+    assert "The Algorithm of Love" in user and "Midnight in Mysore" in user
+    assert "Total royalty pending across all books: Rs 7,865" in user and "LIKELY OVERDUE" in user
+    assert "sneha.kulkarni@email.com" not in user and "Bangalore" not in user
+
+
+def test_in_production_draft_names_the_stage(tok, fake):
+    fake.replies = ['{"category": "Book Status & Production Updates", "priority": "Medium", "reasoning": "x"}', "draft"]
+    t = new_ticket(tok, who="sneha", book_id="BK013", subject="When will my cover be ready?",
+                   description="My book has been in cover design for weeks. When is the next step?")
+    client.get(f"{API}/admin/tickets/{t['id']}/draft", headers=bearer(tok["admin"]))
+    user = fake.calls[1][1]
+    assert "stage 3 of 9 (Cover Design); next: Typesetting" in user and "author's approval" in user
+
+
+def test_category_change_drops_the_cached_draft(tok, fake):
+    fake.replies = ['{"category": "General Inquiry", "priority": "Low", "reasoning": "x"}', "general draft", "royalty draft"]
+    t = new_ticket(tok)
+    assert client.get(f"{API}/admin/tickets/{t['id']}/draft", headers=bearer(tok["admin"])).json()["text"] == "general draft"
+    client.patch(f"{API}/admin/tickets/{t['id']}", json={"priority": "High"}, headers=bearer(tok["admin"]))
+    assert client.get(f"{API}/admin/tickets/{t['id']}/draft", headers=bearer(tok["admin"])).json()["cached"] is True
+    client.patch(f"{API}/admin/tickets/{t['id']}", json={"category": "Royalty & Payments"}, headers=bearer(tok["admin"]))
+    fresh = client.get(f"{API}/admin/tickets/{t['id']}/draft", headers=bearer(tok["admin"])).json()
+    assert fresh["text"] == "royalty draft" and fresh["cached"] is False
+    assert "80/20 split" in fake.system_of(-1)  # the new draft used the royalty policy

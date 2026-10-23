@@ -29,6 +29,7 @@ from app.schemas.admin import (
 from app.schemas.books import BookOut
 from app.schemas.tickets import TicketBookOut
 from app.services.ai_classifier import classified_by
+from app.services.ai_drafts import forget_draft
 from app.services.tickets import now
 
 UNRESOLVED = (TicketStatus.OPEN, TicketStatus.IN_PROGRESS)
@@ -134,6 +135,7 @@ def update_ticket(db: Session, ticket: Ticket, data: TicketUpdate) -> Ticket:
     if not changes:
         raise APIError(422, "NOTHING_TO_UPDATE", "Send at least one of: status, category, priority, assigned_to")
 
+    category_before = ticket.category
     for field in ("status", "category", "priority"):
         if changes.get(field) is not None:
             setattr(ticket, field, changes[field])
@@ -147,6 +149,10 @@ def update_ticket(db: Session, ticket: Ticket, data: TicketUpdate) -> Ticket:
             if assignee is None or not _is_admin(assignee):
                 raise APIError(422, "INVALID_ASSIGNEE", "Tickets can only be assigned to a BookLeaf admin")
         ticket.assigned_to = assignee_id
+
+    if ticket.category != category_before:
+        # The cached AI draft quoted the old category's policy; the next GET makes a fresh one.
+        forget_draft(db, ticket.id)
 
     ticket.updated_at = now()
     db.flush()  # write within this request's transaction; get_db commits at the end

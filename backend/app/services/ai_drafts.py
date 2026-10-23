@@ -14,7 +14,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -240,6 +240,12 @@ def build_user_prompt(ticket: Ticket, today: date) -> str:
 
 
 # --- Cache + generate ------------------------------------------------------
+
+def forget_draft(db: Session, ticket_id: uuid.UUID) -> None:
+    """Drop the cached draft. Called when the ticket's category changes: the draft was written
+    with the wrong policy section, so the next GET makes a fresh one. Only flushes."""
+    db.execute(delete(TicketDraft).where(TicketDraft.ticket_id == ticket_id))
+
 
 def _last_author_activity(ticket: Ticket) -> datetime:
     author_msgs = [m.created_at for m in ticket.responses if m.sender.role_name != "admin"]

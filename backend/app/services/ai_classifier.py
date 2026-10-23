@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models import Book, Ticket, TicketCategory as Cat, TicketPriority as Pri
-from app.services.ai_drafts import today_local
+from app.services.ai_drafts import forget_draft, today_local
 from app.services.llm import LLMUnavailable, call_llm
 
 logger = logging.getLogger("bookleaf.ai")
@@ -183,6 +183,7 @@ def classify_ticket(db: Session, ticket: Ticket, *, called_by: str | None = None
     # Reload: an admin may have changed the ticket while the AI was answering.
     ticket = db.get(Ticket, ticket_id, populate_existing=True)
     untouched = ticket.category == DEFAULT_CATEGORY and ticket.priority == DEFAULT_PRIORITY
+    category_before = ticket.category
     if c is not None:
         ticket.ai_category, ticket.ai_priority, ticket.ai_reasoning = c.category, c.priority, c.reasoning
         if admin_requested or untouched:
@@ -194,6 +195,9 @@ def classify_ticket(db: Session, ticket: Ticket, *, called_by: str | None = None
         if untouched:
             ticket.category, ticket.priority = category, priority
         source = "rules"
+    if ticket.category != category_before:
+        # A draft made while the ticket was still unclassified used the wrong policy section.
+        forget_draft(db, ticket_id)
     db.flush()
     return source
 

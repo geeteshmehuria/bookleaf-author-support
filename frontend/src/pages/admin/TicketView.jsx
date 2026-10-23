@@ -279,8 +279,10 @@ export default function TicketView() {
             </ol>
           </section>
 
+          {/* Keyed on category too: changing it drops the cached draft on the server
+              (it quoted the old category's policy), so the panel loads a fresh one. */}
           <AiDraftPanel
-            key={ticket.id}
+            key={`${ticket.id}:${ticket.category}`}
             ticketId={ticket.id}
             onUse={(text) => {
               setReply({ text, fromDraft: true })

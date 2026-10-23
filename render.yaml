@@ -1,17 +1,10 @@
-# Render Blueprint: Postgres + FastAPI backend + React static site.
+# Render Blueprint for the API. The database is on Neon and the frontend on Vercel (see README > Deploy).
 # Render dashboard -> New -> Blueprint -> pick this repo. Then fill the "sync: false" values.
-databases:
-  - name: bookleaf-db
-    plan: free
-    databaseName: bookleaf_db
-    region: singapore # closest free region to India; can't be changed later
-
 services:
   - type: web
     name: bookleaf-api
     runtime: python
     plan: free
-    region: singapore # same region as the database
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     # The seed is idempotent: creates the schema on an empty database, upserts the 10 authors
@@ -23,15 +16,13 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.7
       - key: DATABASE_URL
-        fromDatabase:
-          name: bookleaf-db
-          property: connectionString
+        sync: false # Neon connection string
       - key: JWT_SECRET
         generateValue: true
       - key: ENVIRONMENT
         value: production
       - key: CORS_ORIGINS
-        sync: false # the frontend URL, e.g. https://bookleaf-web.onrender.com
+        sync: false # the Vercel URL, e.g. https://bookleaf-author-support-coral.vercel.app
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
@@ -40,34 +31,3 @@ services:
         sync: false
       - key: GEMINI_THINKING_LEVEL
         value: low
-
-  - type: web
-    name: bookleaf-web
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm ci && npm run build
-    staticPublishPath: dist
-    # React Router: every path serves index.html so /admin/tickets/... works on refresh
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    # Same protections the API sends: no framing (clickjacking), no MIME sniffing, HTTPS only
-    headers:
-      - path: /*
-        name: X-Frame-Options
-        value: DENY
-      - path: /*
-        name: X-Content-Type-Options
-        value: nosniff
-      - path: /*
-        name: Referrer-Policy
-        value: strict-origin-when-cross-origin
-      - path: /*
-        name: Strict-Transport-Security
-        value: max-age=31536000; includeSubDomains
-    envVars:
-      - key: NODE_VERSION
-        value: 22.12.0 # Vite 8 needs Node 20.19+ or 22.12+
-      - key: VITE_API_URL
-        sync: false # the backend URL + /api/v1, e.g. https://bookleaf-api.onrender.com/api/v1

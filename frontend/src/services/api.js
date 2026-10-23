@@ -80,5 +80,4 @@ export const api = {
   get: (url) => apiRequest(url, { method: "GET" }),
   post: (url, body) => apiRequest(url, { method: "POST", body: JSON.stringify(body) }),
   patch: (url, body) => apiRequest(url, { method: "PATCH", body: JSON.stringify(body) }),
-  delete: (url) => apiRequest(url, { method: "DELETE" }),
 }

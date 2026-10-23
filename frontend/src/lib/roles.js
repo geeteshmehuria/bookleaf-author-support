@@ -1,5 +1,5 @@
 /** Where each role lands after login. The role comes from the API, never from the URL. */
-export const ROLE_HOME = {
+const ROLE_HOME = {
   author: "/author",
   admin: "/admin",
 }

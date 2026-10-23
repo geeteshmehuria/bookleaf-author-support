@@ -19,6 +19,10 @@ SECURITY_HEADERS = {
 def register_security_middleware(app: FastAPI) -> None:
     @app.middleware("http")
     async def guard_and_headers(request: Request, call_next):
+        # A chunked body has no Content-Length, so the size check below can't see it and the whole
+        # body would be read into memory. Browsers never send chunked JSON, so refuse it.
+        if "chunked" in request.headers.get("transfer-encoding", "").lower():
+            return JSONResponse(status_code=411, content=error_body("LENGTH_REQUIRED", "Send the request with a Content-Length header"))
         length = request.headers.get("content-length")
         if length and length.isdigit() and int(length) > MAX_BODY_BYTES:
             return JSONResponse(status_code=413, content=error_body("PAYLOAD_TOO_LARGE", "Request body is too large"))

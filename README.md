@@ -8,7 +8,7 @@ An author support portal with AI help for BookLeaf's operations team.
 | | |
 |---|---|
 | **Live demo** | https://bookleaf-author-support-coral.vercel.app (API: https://bookleaf-api-nvn1.onrender.com/api/v1/health — free plan, first request may take ~1 min) |
-| **API docs (Swagger)** | Local: http://localhost:8000/api/v1/docs · Live: `<api-url>/api/v1/docs` (note: `/api/v1/docs`, not `/docs`) |
+| **API docs (Swagger)** | Local: http://localhost:8000/api/v1/docs · Live: https://bookleaf-api-nvn1.onrender.com/api/v1/docs (note: `/api/v1/docs`, not `/docs`) |
 | **Write-up** | [WRITEUP.md](WRITEUP.md) |
 
 ## Test logins
@@ -194,9 +194,15 @@ Live setup (all free plans):
    - `CORS_ORIGINS` = the Vercel URL (no trailing slash)
    - `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_CLASSIFY_MODEL`
    - `JWT_SECRET` is generated. On start the API creates the tables and seeds the sample data.
-3. **Vercel:** import the repo, root directory `frontend`, env `VITE_API_URL` = `<Render URL>/api/v1`, deploy.
+3. **Vercel:** import the repo, root directory `frontend`, env `VITE_API_URL` = `https://bookleaf-api-nvn1.onrender.com/api/v1`, deploy.
    If the API URL changes, update the `connect-src` entry in `frontend/vercel.json` too.
-4. Test: `<Render URL>/api/v1/health`, then log in as an author and an admin.
+4. **Check the live site** (after any deploy that changes config or headers):
+   - [ ] https://bookleaf-api-nvn1.onrender.com/api/v1/health returns 200 (the first call may take ~1 min)
+   - [ ] `curl -I https://bookleaf-author-support-coral.vercel.app` shows the `Content-Security-Policy` header
+   - [ ] a deep link such as https://bookleaf-author-support-coral.vercel.app/admin/tickets loads on refresh
+   - [ ] as an admin: the queue cards and table load, and a ticket opens with its AI draft
+   - [ ] as an author: My books, a book page, Support and a ticket thread load
+   - [ ] the browser console shows no CSP (`Refused to …`) or CORS errors
 
 Pushing to `main` redeploys both. The free API sleeps after 15 min idle (first request takes ~1 min).
 

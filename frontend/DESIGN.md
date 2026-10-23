@@ -11,7 +11,6 @@ The UI uses [shadcn/ui](https://ui.shadcn.com) components (JavaScript, `new-york
 | `frontend/src/components/ui/` | shadcn components (`button.jsx`, `input.jsx`, `sidebar.jsx`, ...) plus our own `stat-card.jsx` and `field.jsx` |
 | `frontend/src/components/layout/` | `AppShell`, `AuthorLayout` (calm, 720px column), `AdminLayout` (dense, full width), `LoginLayout` |
 | `frontend/src/lib/utils.js` | `cn()` class helper + shared `focusRing` / `fieldBase` class strings |
-| `/theme-preview` | Dev-only styleguide: every token with live contrast PASS/FAIL, type scale, every component state, both shells at desktop and 360px. Not included in production builds. |
 
 Tailwind v4 has no `tailwind.config.js`; the theme lives in CSS (`@theme`).
 
@@ -52,11 +51,11 @@ import { Input } from "@/components/ui/input"
 
 1. `cd frontend && npx shadcn@latest add <name>` (reads `components.json`: JS, `@/` aliases).
 2. Open the new file in `src/components/ui/` and check it only uses token classes: no hex, no `dark:` classes, focus uses `focusRing` (buttons, links) or `fieldBase` (inputs).
-3. Look at it on `/theme-preview`.
+3. Check it in the running app, at desktop width and at 360px.
 
 ## Change the brand colour
 
-Edit two values in `tokens.css`: `--brand-primary` (decorative coral: progress, active bar, focus ring, icons) and `--brand-primary-action` (filled buttons; must give **≥ 4.5:1 with white text**). Then check `/theme-preview` for any FAIL.
+Edit two values in `tokens.css`: `--brand-primary` (decorative coral: progress, active bar, focus ring, icons) and `--brand-primary-action` (filled buttons; must give **≥ 4.5:1 with white text**). Then re-check contrast (e.g. with the WebAIM contrast checker).
 
 > **Warning:** Tailwind's default colour palette is removed (`--color-*: initial`). Classes like `bg-gray-100` or `text-blue-600` **silently produce no style**: no error, no warning. Use the token classes above. Only `white`, `black`, `transparent` and `current` are kept.
 

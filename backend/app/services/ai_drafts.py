@@ -2,7 +2,8 @@
 
 Token saving (what each call sends, and what it doesn't):
 - only the knowledge-base section for THIS ticket's category, plus the tone rules
-- only the ONE book the ticket is about (not the author's other books)
+- only the ONE book the ticket is about (not the author's other books); a General /
+  Account-level ticket gets one short line per book instead, so it can still quote real numbers
 - the original query + the last 3 messages (not the full history); each capped in length
 - the author's first name only: no email, phone or city
 - internal notes are never sent, so private remarks can't leak into a reply
@@ -111,6 +112,62 @@ def _money(v) -> str:
     return "not set (in production)" if v is None else f"Rs {float(v):,.0f}"
 
 
+# --- Production stage, computed in code ---------------------------------------
+
+# From the knowledge base, in order. The dataset's status text names the current one,
+# e.g. "In Production - Cover Design".
+PRODUCTION_STAGES = [
+    "Manuscript Received", "Editing", "Cover Design", "Typesetting", "Proofreading",
+    "ISBN Assignment", "Printing", "Distribution Setup", "Published & Live",
+]
+
+
+def production_facts(book: Book) -> list[str]:
+    """Where an in-production book is and what comes next, so the reply can be specific."""
+    current = book.status.split(" - ", 1)[-1].strip().lower()
+    names = [s.lower() for s in PRODUCTION_STAGES]
+    if current not in names:
+        return []
+    i = names.index(current)
+    if i == len(PRODUCTION_STAGES) - 1:
+        return []
+    remaining = PRODUCTION_STAGES[i + 1:]
+    fact = f"Production: stage {i + 1} of {len(PRODUCTION_STAGES)} ({PRODUCTION_STAGES[i]}); next: {', '.join(remaining)}."
+    if PRODUCTION_STAGES[i] == "Cover Design":
+        fact += " Cover Design usually waits on the author's approval of the draft cover."
+    return [fact]
+
+
+def portfolio_facts(books: list[Book], today: date, category: Cat) -> list[str]:
+    """For a General / Account-level ticket: one short line per book instead of nothing,
+    so a question like "where is my royalty?" still gets real numbers. Still no contact details."""
+    if not books:
+        return ["The author has no books with BookLeaf yet."]
+    facts = [f"General / account-level query (no specific book). The author's {len(books)} book(s):"]
+    for b in sorted(books, key=lambda b: b.id):
+        last = b.last_royalty_payout_date
+        facts.append(
+            f'  "{b.title}" ({b.id}): {b.status}; copies sold {b.total_copies_sold}; '
+            f"pending {_money(b.royalty_pending)}; last payout {last.strftime('%d %b %Y') if last else 'never'}."
+        )
+    if category == Cat.ROYALTY:
+        pending = [b for b in books if float(b.royalty_pending) > 0]
+        total = sum(float(b.royalty_pending) for b in books)
+        facts.append(f"Total royalty pending across all books: Rs {total:,.0f}.")
+        # Schedule line once, then the per-book verdict (overdue / rolls over / on track).
+        facts.append(royalty_facts(pending[0] if pending else books[0], today)[0])
+        # The per-book verdicts, without repeating the "how to reply" instruction for each book.
+        how_to_reply = None
+        for b in pending:
+            verdict = royalty_facts(b, today)[1]
+            verdict, sep, instruction = verdict.partition(" Apologise,")
+            how_to_reply = how_to_reply or (f"Apologise,{instruction}" if sep else None)
+            facts.append(f"  {b.title}: {verdict}")
+        if how_to_reply:
+            facts.append(how_to_reply)
+    return facts
+
+
 def book_facts(book: Book) -> list[str]:
     last = book.last_royalty_payout_date
     return [
@@ -157,10 +214,12 @@ def build_user_prompt(ticket: Ticket, today: date) -> str:
     facts = [f"Today's date: {today:%d %b %Y}.", f"Author first name: {_author_first_name(ticket)}.", f"Ticket status: {ticket.status.value}."]
     if ticket.book is not None:
         facts += book_facts(ticket.book)
+        if ticket.book.status.lower().startswith("in production"):
+            facts += production_facts(ticket.book)
         if ticket.category == Cat.ROYALTY:
             facts += royalty_facts(ticket.book, today)
     else:
-        facts.append("This is a general / account-level query; no specific book.")
+        facts += portfolio_facts(list(ticket.author.books), today, ticket.category)
 
     def clip(text: str) -> str:
         return text if len(text) <= MAX_MESSAGE_CHARS else text[:MAX_MESSAGE_CHARS] + " [...]"

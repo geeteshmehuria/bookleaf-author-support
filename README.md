@@ -64,7 +64,14 @@ Every author in `data/bookleaf_sample_data.json` can log in with `Author@123`. E
 
 ## AI integration
 
-**Model: Google Gemini**, set in `backend/.env`. Free tier, fast, and it can return strict JSON. Two settings so each job uses the cheapest model that does it well:
+**Model: Google Gemini (Flash / Flash-Lite)**, set in `backend/.env`. Why this over gpt-4o-mini or Claude Haiku, which the brief suggests:
+
+- **Cost:** a free tier, so the live demo can be tested without a paid key; the paid price is in the same low range as the other two.
+- **Strict JSON:** Gemini accepts a response schema, so classification can only return one of the 6 categories and 4 priorities (and we validate it again in code).
+- **Speed:** Flash models answer in about 1-3 s, which matters because the draft is made while the admin opens the ticket.
+- **Swappable:** all calls go through `services/llm.py`, so moving to another provider changes one file.
+
+Two settings so each job uses the cheapest model that does it well:
 
 | Setting | Used for | Suggested |
 |---|---|---|
@@ -77,12 +84,16 @@ Model IDs change often; copy current ones from [AI Studio](https://aistudio.goog
 
 **2. Draft reply** (`services/ai_drafts.py`): made when an admin opens a ticket, cached in `ticket_drafts`, and edited before sending. Replies started from a draft are marked `is_ai_drafted`. Prompt rules: acknowledge first, use the real numbers given, own BookLeaf's mistakes, give a timeline, end with a next step, never invent facts.
 
-**Facts are computed in code, not by the model:** payout due dates (quarter end + 45 days), the ₹1,000 rollover threshold, and a "likely overdue" flag. The model is told to quote these, not calculate them. The sample data's last payouts are in 2025, so today's date is always passed in.
+**Facts are computed in code, not by the model:** payout due dates (quarter end + 45 days), the ₹1,000 rollover threshold, a "likely overdue" flag, and for books in production the current stage ("stage 3 of 9, Cover Design; next: Typesetting…"). The model is told to quote these, not calculate them. The sample data's last payouts are in 2025, so today's date is always passed in.
+
+**General / Account-level tickets** have no book, so the prompt gets one short line per book (status, copies sold, pending, last payout) and, for royalty questions, the total pending and a per-book overdue / rollover verdict. A "where are my royalties?" without a book picked still gets real numbers.
+
+**Draft kept in sync with the category:** if an admin (or the background AI) changes the category, the cached draft is dropped, because it quoted the old category's policy. The panel then loads a fresh one.
 
 **Saving tokens** (about 550 tokens per classification, about 1,100 per draft):
 
 - only the knowledge-base section for the ticket's category, not the whole knowledge base (`services/knowledge_base.py`)
-- only the one book the ticket is about, not the author's other books
+- only the one book the ticket is about, not the author's other books (account-level tickets get one line per book)
 - the original query plus the last 3 messages, each capped in length
 - drafts cached: reopening a ticket costs nothing; "Regenerate" is explicit
 - the seed never calls the AI; sample tickets are pre-classified

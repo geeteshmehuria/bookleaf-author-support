@@ -35,7 +35,6 @@ class Settings(BaseSettings):
     
     # Environment
     ENVIRONMENT: str = "development"
-    PORT: int = 8000
 
     @field_validator("JWT_SECRET")
     @classmethod

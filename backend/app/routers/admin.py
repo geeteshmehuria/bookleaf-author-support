@@ -4,12 +4,10 @@ from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
-from sqlalchemy import func, select
 
 from app.core.database import DbSession
 from app.core.deps import require_admin
-from app.models import Ticket, TicketCategory, TicketPriority, TicketStatus, User
+from app.models import TicketCategory, TicketPriority, TicketStatus, User
 from app.schemas.admin import (
     AdminReplyCreate,
     AdminTicketDetail,
@@ -54,14 +52,18 @@ def ticket_queue(
     offset: int = Query(0, ge=0),
     admin: User = Depends(require_admin),
 ) -> TicketPage:
-    """All tickets from all authors, filterable and sorted by urgency by default."""
+    """All tickets from all authors, filterable and sorted by urgency by default.
+    `summary` holds the counts for the dashboard cards, so the page needs one request, not two."""
     f = QueueFilters(
         status=status, category=category, priority=priority, assigned=assigned, created_from=created_from,
         created_to=created_to, q=q, sort=sort, limit=limit, offset=offset,
     )
     tickets, total = svc.list_queue(db, f, admin)
     now = svc.now()
-    return TicketPage(items=[svc.to_row(t, now) for t in tickets], total=total, limit=limit, offset=offset)
+    return TicketPage(
+        items=[svc.to_row(t, now) for t in tickets], total=total, limit=limit, offset=offset,
+        summary=svc.queue_summary(db, admin),
+    )
 
 
 @router.get("/tickets/{ticket_id}", response_model=AdminTicketDetail, responses=error_responses(404))
@@ -139,28 +141,3 @@ def reclassify(ticket_id: str, db: DbSession, admin: User = Depends(require_admi
 def team(db: DbSession) -> list[User]:
     """Admins a ticket can be assigned to."""
     return svc.list_team(db)
-
-
-# --- Dashboard summary -----------------------------------------------------
-
-class QueueSummary(BaseModel):
-    by_status: dict[str, int]
-    unresolved_by_priority: dict[str, int]
-    unassigned_unresolved: int
-    assigned_to_me: int
-
-
-@router.get("/summary", response_model=QueueSummary)
-def queue_summary(db: DbSession, admin: User = Depends(require_admin)) -> QueueSummary:
-    """Ticket counts for the admin dashboard."""
-    unresolved = Ticket.status.in_(svc.UNRESOLVED)
-    by_status = dict(db.execute(select(Ticket.status, func.count()).group_by(Ticket.status)).all())
-    by_priority = dict(db.execute(select(Ticket.priority, func.count()).where(unresolved).group_by(Ticket.priority)).all())
-    count = lambda *where: db.scalar(select(func.count()).select_from(Ticket).where(*where)) or 0  # noqa: E731
-    return QueueSummary(
-        # Every status / priority listed, with 0 where there are none, so the UI never has a missing key.
-        by_status={s.value: by_status.get(s, 0) for s in TicketStatus},
-        unresolved_by_priority={p.value: by_priority.get(p, 0) for p in TicketPriority},
-        unassigned_unresolved=count(unresolved, Ticket.assigned_to.is_(None)),
-        assigned_to_me=count(unresolved, Ticket.assigned_to == admin.id),
-    )

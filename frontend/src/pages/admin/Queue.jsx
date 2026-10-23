@@ -70,8 +70,8 @@ function FilterSelect({ id, label, value, onChange, options }) {
   )
 }
 
-function Summary() {
-  const { data } = useApi("/admin/summary", { pollMs: 10000 })
+/** The count cards. `data` comes with the queue response, so there is no separate request. */
+function Summary({ data }) {
   const cards = [
     ["Open", data?.by_status.Open, Inbox, "?status=Open"],
     ["Critical / High open", data && data.unresolved_by_priority.Critical + data.unresolved_by_priority.High, AlertTriangle, "?"],
@@ -93,7 +93,8 @@ export default function Queue() {
   const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
-  // Refreshes every 10 s so new tickets and author replies appear on their own.
+  // Refreshes every 10 s (slower while nothing changes) so new tickets and author replies appear
+  // on their own. The response also carries the summary counts: one request per refresh.
   const { data, error, loading, reload } = useApi(`/admin/tickets?${toApiQuery(params)}`, { pollMs: 10000 })
 
   const get = (key) => params.get(key) ?? DEFAULTS[key] ?? ""
@@ -130,7 +131,7 @@ export default function Queue() {
 
   return (
     <div className="grid gap-5">
-      <Summary />
+      <Summary data={data?.summary} />
 
       <Card className="gap-4 p-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

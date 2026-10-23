@@ -24,6 +24,7 @@ from app.schemas.admin import (
     NoteOut,
     PersonOut,
     QueueFilters,
+    QueueSummary,
     TicketUpdate,
 )
 from app.schemas.books import BookOut
@@ -107,6 +108,20 @@ def list_queue(db: Session, f: QueueFilters, me: User) -> tuple[list[Ticket], in
         .offset(f.offset)
     ).all()
     return list(rows), total or 0
+
+
+def queue_summary(db: Session, me: User) -> QueueSummary:
+    unresolved = Ticket.status.in_(UNRESOLVED)
+    by_status = dict(db.execute(select(Ticket.status, func.count()).group_by(Ticket.status)).all())
+    by_priority = dict(db.execute(select(Ticket.priority, func.count()).where(unresolved).group_by(Ticket.priority)).all())
+    count = lambda *where: db.scalar(select(func.count()).select_from(Ticket).where(*where)) or 0  # noqa: E731
+    return QueueSummary(
+        # Every status / priority listed, with 0 where there are none, so the UI never has a missing key.
+        by_status={s.value: by_status.get(s, 0) for s in TicketStatus},
+        unresolved_by_priority={p.value: by_priority.get(p, 0) for p in TicketPriority},
+        unassigned_unresolved=count(unresolved, Ticket.assigned_to.is_(None)),
+        assigned_to_me=count(unresolved, Ticket.assigned_to == me.id),
+    )
 
 
 # --- Single ticket ---------------------------------------------------------

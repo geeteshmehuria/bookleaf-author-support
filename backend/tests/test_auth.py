@@ -118,7 +118,7 @@ def test_token_signed_with_other_secret_is_401():
         "attacker-secret-attacker-secret-attacker",
         algorithm="HS256",
     )
-    assert_error(client.get(f"{API}/admin/summary", headers=bearer(forged)), 401, "INVALID_TOKEN")
+    assert_error(client.get(f"{API}/admin/tickets", headers=bearer(forged)), 401, "INVALID_TOKEN")
 
 
 def test_expired_token_is_401():
@@ -135,23 +135,23 @@ def test_role_in_token_is_not_trusted(author_token):
     # is still refused: the role is read from the database, not the token.
     claims = jwt.decode(author_token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
     tampered = jwt.encode({**claims, "role": "admin"}, settings.JWT_SECRET, algorithm=settings.JWT_ALGORITHM)
-    assert_error(client.get(f"{API}/admin/summary", headers=bearer(tampered)), 403, "FORBIDDEN")
+    assert_error(client.get(f"{API}/admin/tickets", headers=bearer(tampered)), 403, "FORBIDDEN")
 
 
 # --- Role-based access -----------------------------------------------------
 
 def test_author_on_admin_route_is_403(author_token):
-    assert_error(client.get(f"{API}/admin/summary", headers=bearer(author_token)), 403, "FORBIDDEN")
+    assert_error(client.get(f"{API}/admin/tickets", headers=bearer(author_token)), 403, "FORBIDDEN")
 
 
 def test_no_token_on_admin_route_is_401():
-    assert_error(client.get(f"{API}/admin/summary"), 401, "NOT_AUTHENTICATED")
+    assert_error(client.get(f"{API}/admin/tickets"), 401, "NOT_AUTHENTICATED")
 
 
 def test_admin_on_admin_route_is_200(admin_token):
-    r = client.get(f"{API}/admin/summary", headers=bearer(admin_token))
+    r = client.get(f"{API}/admin/tickets", headers=bearer(admin_token))
     assert r.status_code == 200
-    body = r.json()
+    body = r.json()["summary"]
     assert set(body["by_status"]) == {"Open", "In Progress", "Resolved", "Closed"}
     assert sum(body["by_status"].values()) >= 6  # seeded tickets
 

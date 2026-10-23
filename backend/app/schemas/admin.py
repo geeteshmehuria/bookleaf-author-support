@@ -47,11 +47,22 @@ class AdminTicketRow(BaseModel):
     overdue: bool = Field(description=f"Open / In Progress, waiting on support for over {OVERDUE_AFTER_HOURS} h")
 
 
+class QueueSummary(BaseModel):
+    """Counts for the cards above the queue. Always across ALL tickets, not just the filtered page."""
+
+    by_status: dict[str, int]
+    unresolved_by_priority: dict[str, int]
+    unassigned_unresolved: int
+    assigned_to_me: int
+
+
 class TicketPage(BaseModel):
     items: list[AdminTicketRow]
     total: int
     limit: int
     offset: int
+    # Sent with the queue so one poll refreshes both the table and the cards (one request, not two).
+    summary: QueueSummary
 
 
 class AuthorProfileOut(BaseModel):

@@ -50,6 +50,21 @@ def test_many_accounts_from_one_ip_is_blocked():
     assert_error(try_login("nobody-new@email.com", "guess"), 429, "RATE_LIMITED")
 
 
+def test_faked_ip_header_does_not_bypass_the_account_limit(monkeypatch):
+    # Behind a proxy the IP comes from X-Forwarded-For, which a client can set. A new fake IP per
+    # guess resets the per-IP counts, but the per-email cap still stops guessing one account.
+    # (TestClient has no proxy, so read the header the way uvicorn --proxy-headers would.)
+    from app.routers import auth
+    monkeypatch.setattr(auth, "client_ip", lambda request: request.headers.get("x-forwarded-for", "test"))
+    for i in range(10):
+        r = client.post(f"{API}/auth/login", json={"email": "vikram.joshi@email.com", "password": "wrong"},
+                        headers={"X-Forwarded-For": f"10.0.0.{i}"})
+        assert r.status_code == 401
+    r = client.post(f"{API}/auth/login", json={"email": "vikram.joshi@email.com", "password": "wrong"},
+                    headers={"X-Forwarded-For": "10.0.0.99"})
+    assert_error(r, 429, "RATE_LIMITED")
+
+
 def test_unknown_email_is_rate_limited_like_a_real_one():
     # same behaviour for both, so the limit doesn't reveal which emails exist
     for _ in range(5):
@@ -101,6 +116,13 @@ def test_ai_limit_skips_the_call_and_falls_back(monkeypatch):
 def test_huge_body_is_rejected_before_parsing():
     r = client.post(f"{API}/auth/login", content=b"x" * 100_000, headers={"Content-Type": "application/json"})
     assert_error(r, 413, "PAYLOAD_TOO_LARGE")
+
+
+def test_chunked_body_is_refused():
+    # No Content-Length means the 64 KB check can't run; without this the body is read in full.
+    r = client.post(f"{API}/auth/login", content=iter([b'{"email":"a@b.c",', b'"password":"x"}']),
+                    headers={"Content-Type": "application/json"})
+    assert_error(r, 411, "LENGTH_REQUIRED")
 
 
 def test_security_headers_on_every_response():

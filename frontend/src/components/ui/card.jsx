@@ -75,38 +75,10 @@ function CardAction({
   )
 }
 
-function CardContent({
-  className,
-  ...props
-}) {
-  return (
-    <div
-      data-slot="card-content"
-      className={cn(className)}
-      {...props}
-    />
-  )
-}
-
-function CardFooter({
-  className,
-  ...props
-}) {
-  return (
-    <div
-      data-slot="card-footer"
-      className={cn("flex items-center [.border-t]:pt-6", className)}
-      {...props}
-    />
-  )
-}
-
 export {
   Card,
   CardHeader,
-  CardFooter,
   CardTitle,
   CardAction,
   CardDescription,
-  CardContent,
 }

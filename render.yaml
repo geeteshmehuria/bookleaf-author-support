@@ -4,12 +4,14 @@ databases:
   - name: bookleaf-db
     plan: free
     databaseName: bookleaf_db
+    region: singapore # closest free region to India; can't be changed later
 
 services:
   - type: web
     name: bookleaf-api
     runtime: python
     plan: free
+    region: singapore # same region as the database
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     # The seed is idempotent: creates the schema on an empty database, upserts the 10 authors
@@ -65,5 +67,7 @@ services:
         name: Strict-Transport-Security
         value: max-age=31536000; includeSubDomains
     envVars:
+      - key: NODE_VERSION
+        value: 22.12.0 # Vite 8 needs Node 20.19+ or 22.12+
       - key: VITE_API_URL
         sync: false # the backend URL + /api/v1, e.g. https://bookleaf-api.onrender.com/api/v1

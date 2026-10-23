@@ -12,7 +12,7 @@ from sqlalchemy import delete, select
 
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.models import LlmLog, Ticket, TicketCategory, TicketDraft
+from app.models import LlmLog, Ticket, TicketDraft
 from app.services import llm
 from app.services.ai_classifier import classify_by_rules
 from app.services.ai_drafts import royalty_facts

@@ -5,7 +5,7 @@ from sqlalchemy import delete
 from app.core.database import SessionLocal
 from app.core.rate_limit import AI_CALLS_PER_USER
 from app.models import Ticket
-from tests.test_ai import FakeGemini, quota_error  # noqa: F401  (reuse the fake Gemini)
+from tests.test_ai import FakeGemini  # reuse the fake Gemini
 from tests.test_auth import API, assert_error, bearer, client, login
 
 T = "[pytest]"

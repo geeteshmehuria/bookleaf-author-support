@@ -7,7 +7,7 @@ An author support portal with AI help for BookLeaf's operations team.
 
 | | |
 |---|---|
-| **Live demo** | _add URL after deploying (see [Deploy](#deploy))_ |
+| **Live demo** | https://bookleaf-author-support-coral.vercel.app (API: https://bookleaf-api-nvn1.onrender.com/api/v1/health — free plan, first request may take ~1 min) |
 | **API docs (Swagger)** | Local: http://localhost:8000/api/v1/docs · Live: `<api-url>/api/v1/docs` (note: `/api/v1/docs`, not `/docs`) |
 | **Write-up** | [WRITEUP.md](WRITEUP.md) |
 
@@ -173,25 +173,32 @@ All paths start with `/api/v1`. Send `Authorization: Bearer <token>`.
 | Access | Role checked on every route; authors only see their own data |
 | Input | Length limits on every field; bodies over 64 KB, or chunked (no Content-Length), rejected |
 | Secrets | Only in env variables; `.env` git-ignored; AI key never sent to the browser |
-| Browser | CORS limited to the frontend; security headers on the API and the frontend site; HSTS in production |
+| Browser | CORS limited to the frontend; security headers on the API; CSP, no-framing and nosniff on the frontend; HSTS in production |
 | AI | Author text treated as data, not instructions; drafts never sent automatically |
 
 **Visitor IP behind Render's proxy:** the API starts with `--proxy-headers --forwarded-allow-ips='*'` so rate limits see the visitor's IP, not the proxy's (otherwise every visitor shares one IP and 20 failed logins lock out everyone). Trusting `*` is safe only because Render's proxy is the only way in, and a client can still fake its IP; that's why one account also has a cap from any IP.
 
 ## Deploy
 
-`render.yaml` creates the database, API and frontend on [Render](https://render.com) (free plans, Singapore region).
+Live setup (all free plans):
 
-1. Push `main` to GitHub. Render → **New → Blueprint** → pick this repo.
-2. Render asks for the `sync: false` values:
-   - `bookleaf-api`: `CORS_ORIGINS` = `https://bookleaf-web.onrender.com` (no trailing slash), `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_CLASSIFY_MODEL`
-   - `bookleaf-web`: `VITE_API_URL` = `https://bookleaf-api.onrender.com/api/v1`
-3. **Apply.** The API creates the tables and seeds the sample data on start; `JWT_SECRET` is generated.
-4. Check the real URLs on each service page. If Render added a suffix (name already taken), fix the two values above and redeploy `bookleaf-web` (the API URL is baked in at build time).
-5. Test: open `<API URL>/api/v1/health`, then log in as an author and an admin.
-6. Put both URLs at the top of this README.
+| Part | Host | Notes |
+|---|---|---|
+| Database | [Neon](https://neon.tech) Postgres | Free plan doesn't expire |
+| API | [Render](https://render.com) web service | Settings in `render.yaml` |
+| Frontend | [Vercel](https://vercel.com) | Settings in `frontend/vercel.json` (SPA rewrite + security headers) |
 
-Free plan notes: the API sleeps after 15 min idle (first request takes ~1 min); the free database expires 30 days after creation.
+1. **Neon:** create a project → copy the connection string (direct, not pooled).
+2. **Render:** New → Blueprint → this repo (or a Web Service with the same settings as `render.yaml`). Set:
+   - `DATABASE_URL` = the Neon string
+   - `CORS_ORIGINS` = the Vercel URL (no trailing slash)
+   - `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_CLASSIFY_MODEL`
+   - `JWT_SECRET` is generated. On start the API creates the tables and seeds the sample data.
+3. **Vercel:** import the repo, root directory `frontend`, env `VITE_API_URL` = `<Render URL>/api/v1`, deploy.
+   If the API URL changes, update the `connect-src` entry in `frontend/vercel.json` too.
+4. Test: `<Render URL>/api/v1/health`, then log in as an author and an admin.
+
+Pushing to `main` redeploys both. The free API sleeps after 15 min idle (first request takes ~1 min).
 
 ## Known limitations
 

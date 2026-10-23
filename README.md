@@ -10,6 +10,7 @@ An author support portal with AI help for BookLeaf's operations team.
 | **Live demo** | https://bookleaf-author-support-coral.vercel.app (free plan: the first request may take ~1 min while the API wakes up) |
 | **API docs (Swagger)** | https://bookleaf-api-nvn1.onrender.com/api/v1/docs |
 | **Write-up** | [WRITEUP.md](WRITEUP.md) |
+| **Tests, security, deploy, troubleshooting** | [docs/OPERATIONS.md](docs/OPERATIONS.md) |
 
 ## Test logins
 

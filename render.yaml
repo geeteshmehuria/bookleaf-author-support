@@ -1,0 +1,55 @@
+# Render Blueprint: Postgres + FastAPI backend + React static site.
+# Render dashboard -> New -> Blueprint -> pick this repo. Then fill the "sync: false" values.
+databases:
+  - name: bookleaf-db
+    plan: free
+    databaseName: bookleaf_db
+
+services:
+  - type: web
+    name: bookleaf-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # The seed is idempotent: creates the schema on an empty database, upserts the 10 authors
+    # and 18 books from data/bookleaf_sample_data.json, and never overwrites tickets.
+    # --forwarded-allow-ips='*' so rate limits see the visitor's IP (see README, Security).
+    startCommand: python -m app.seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: DATABASE_URL
+        fromDatabase:
+          name: bookleaf-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: CORS_ORIGINS
+        sync: false # the frontend URL, e.g. https://bookleaf-web.onrender.com
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+      - key: GEMINI_CLASSIFY_MODEL
+        sync: false
+      - key: GEMINI_THINKING_LEVEL
+        value: low
+
+  - type: web
+    name: bookleaf-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    # React Router: every path serves index.html so /admin/tickets/... works on refresh
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        sync: false # the backend URL + /api/v1, e.g. https://bookleaf-api.onrender.com/api/v1

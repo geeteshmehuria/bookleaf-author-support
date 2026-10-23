@@ -43,7 +43,7 @@ def ticket_queue(
     status: list[TicketStatus] | None = Query(None, description="Repeat to pick several: ?status=Open&status=In Progress"),
     category: list[TicketCategory] | None = Query(None),
     priority: list[TicketPriority] | None = Query(None),
-    assigned: str = Query("any", description='"any", "me", "unassigned", or an admin user ID'),
+    assigned: Literal["any", "me", "unassigned"] = Query("any"),
     created_from: date | None = Query(None, description="YYYY-MM-DD, inclusive (UTC)"),
     created_to: date | None = Query(None, description="YYYY-MM-DD, inclusive (UTC)"),
     q: str | None = Query(None, max_length=100, description="Search subject, author name or email, or #ticket number"),

@@ -114,7 +114,7 @@ class QueueFilters(BaseModel):
     status: list[TicketStatus] | None = None
     category: list[TicketCategory] | None = None
     priority: list[TicketPriority] | None = None
-    assigned: Literal["any", "me", "unassigned"] | str = "any"
+    assigned: Literal["any", "me", "unassigned"] = "any"
     created_from: date | None = None
     created_to: date | None = None
     q: str | None = None

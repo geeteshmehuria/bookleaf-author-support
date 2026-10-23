@@ -59,8 +59,6 @@ def _apply_filters(stmt, f: QueueFilters, me: User):
         stmt = stmt.where(Ticket.assigned_to == me.id)
     elif f.assigned == "unassigned":
         stmt = stmt.where(Ticket.assigned_to.is_(None))
-    elif f.assigned != "any":
-        stmt = stmt.where(Ticket.assigned_to == f.assigned)
     # Dates are whole days in UTC; created_to is inclusive.
     if f.created_from:
         stmt = stmt.where(Ticket.created_at >= datetime.combine(f.created_from, time.min, timezone.utc))

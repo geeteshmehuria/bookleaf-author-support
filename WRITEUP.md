@@ -2,7 +2,7 @@
 
 ## What I prioritised
 
-1. **The core ticket loop first.** Author raises a query → it is saved at once → admin sees it in a queue sorted by urgency → admin replies → the author sees the reply within 5 seconds. Everything else was built around this loop.
+1. **The core ticket loop first.** Author raises a query → it is saved at once → admin sees it in a queue sorted by urgency → admin replies → the author sees the reply within 5-15 seconds. Everything else was built around this loop.
 2. **AI that helps but never blocks.** Classification runs after the ticket is saved, and every AI step has a fallback (keyword rules for triage, a manual reply box for drafts). The app works fully with no API key at all.
 3. **Facts from the database, wording from the model.** Payout due dates, the ₹1,000 rollover rule, "likely overdue" and the current production stage are computed in code and handed to the model as facts. The model is told to quote them, not calculate them. This is what keeps drafts specific ("₹2,546 pending, no payout yet") instead of generic.
 4. **Access control that can't be bypassed by editing a URL.** Author data is always filtered by the logged-in user from the token, never by an ID in the request. The role is re-read from the database on every call.
@@ -11,7 +11,7 @@
 
 | Choice | Gave up | Why it was worth it |
 |---|---|---|
-| Polling (5 s / 10 s) instead of WebSockets | Instant push | Simple, works on free hosting, pauses when the tab is hidden |
+| Polling (5 s / 10 s, slowing to 3× while nothing changes) instead of WebSockets | Instant push | Simple, works on free hosting, pauses when the tab is hidden |
 | Only the matching knowledge-base section + one book + last 3 messages per prompt | The model seeing everything | ~550 tokens per classification, ~1,100 per draft; cached drafts cost nothing on reopen |
 | Gemini Flash / Flash-Lite | Some reply polish vs. bigger models | Free tier, fast, strict JSON output; two models so triage uses the cheapest one |
 | Sample royalties shown as stored | The 80/20 net-profit formula | The dataset uses a flat amount per copy; recalculating would contradict the numbers we were told to test with |

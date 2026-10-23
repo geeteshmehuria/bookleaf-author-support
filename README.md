@@ -1,184 +1,212 @@
 # BookLeaf Author Support Portal
 
-Helps BookLeaf's support team answer author queries faster.
+An author support portal with AI help for BookLeaf's operations team.
 
-- **Authors** log in, see their books and royalties, raise tickets, and follow replies.
-- **Admins** work one ticket queue, with an AI-suggested category, priority and draft reply.
+- **Authors:** see their books and royalties, raise support queries, follow replies live.
+- **Admins:** one ticket queue with AI category, AI priority and an AI-drafted reply.
 
-**Live demo:** _add URL after deploying (see [Deploy](#deploy))_ · **API docs:** `/api/v1/docs` (Swagger) · **Write-up:** [WRITEUP.md](WRITEUP.md)
-
-## Run locally
-
-Needs Python 3.12, Node 20+, Docker Desktop (running), and optionally a free [Gemini API key](https://aistudio.google.com/apikey). Without a key the app still works; AI falls back to manual mode.
-
-```bash
-# 1. Database (Postgres in Docker; schema.sql runs on first start)
-docker compose up -d
-
-# 2. Backend  →  http://localhost:8000/api/v1/docs
-cd backend
-python -m venv .venv && .venv\Scripts\activate      # macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-copy .env.example .env                              # macOS/Linux: cp; then set JWT_SECRET and GEMINI_API_KEY
-python -m app.seed                                  # 10 authors, 18 books, 2 admins, 6 sample tickets
-uvicorn app.main:app --reload
-
-# 3. Frontend  →  http://localhost:5173
-cd frontend
-copy .env.example .env
-npm install && npm run dev
-```
-
-Tests (database must be running and seeded): `pip install -r requirements-dev.txt` then `pytest -q` in `backend/`.
+| | |
+|---|---|
+| **Live demo** | _add URL after deploying (see [Deploy](#deploy))_ |
+| **API docs (Swagger)** | Local: http://localhost:8000/api/v1/docs · Live: `<api-url>/api/v1/docs` (note: `/api/v1/docs`, not `/docs`) |
+| **Write-up** | [WRITEUP.md](WRITEUP.md) |
 
 ## Test logins
 
 | Role | Email | Password |
 |---|---|---|
-| Admin | `neha.admin@bookleaf.example.com` | `Admin@123` |
-| Admin | `karan.admin@bookleaf.example.com` | `Admin@123` |
-| Author | `sneha.kulkarni@email.com` (has a book in production) | `Author@123` |
-| Author | `ananya.reddy@email.com` (royalty never paid) | `Author@123` |
-| Author | `priya.sharma@email.com` (normal published books) | `Author@123` |
+| **Admin** | `neha.admin@bookleaf.example.com` | `Admin@123` |
+| **Author** | `sneha.kulkarni@email.com` | `Author@123` |
 
-Every author in `data/bookleaf_sample_data.json` can log in with `Author@123`. Everyone uses the same login page; the role returned by the API decides where they land.
+- One login page for both; the account's role decides where you land.
+- Sneha is a good test author: 2 published books with pending royalty + 1 book still in production.
+- Every author in `data/bookleaf_sample_data.json` also works with `Author@123` (e.g. `ananya.reddy@email.com`: royalty never paid).
+- Second admin, to test assigning: `karan.admin@bookleaf.example.com` / `Admin@123`.
+
+## Quick review path (5 minutes)
+
+1. Log in as **Sneha** → **My books** → raise a query under **Support**.
+2. In another window, log in as **Neha** → the new ticket appears in the queue with an AI category and priority.
+3. Open it → check the **AI-drafted reply** → **Use this draft** → edit → **Send**.
+4. Back in Sneha's window → the reply shows up without a page refresh.
+5. As Neha: change status, override category/priority, add an internal note, **Assign to me**.
+
+## What the brief asked for → where it is
+
+Backend paths are under `backend/app/`, frontend paths under `frontend/src/`.
+
+| Requirement | Where |
+|---|---|
+| Email/password login, authors see only their own data | `routers/auth.py`, `core/deps.py` |
+| My Books (all 10 fields, books in production, zero royalty) | `pages/author/MyBooks.jsx`, `components/books/BookCard.jsx` |
+| Raise a query (book or General, subject, description, attachment UI) | `pages/author/NewTicket.jsx` |
+| My Tickets with live updates | `pages/author/MyTickets.jsx`, `TicketDetail.jsx` (polling) |
+| Queue: filter by status, category, priority, date; urgent and old easy to spot | `pages/admin/Queue.jsx` (urgency sort, red rows over 48 h) |
+| AI category + priority, admin can override | `services/ai_classifier.py` |
+| AI draft from the knowledge base, editable before sending | `services/ai_drafts.py`, `services/knowledge_base.py` |
+| Status, internal notes, assign to self | `pages/admin/TicketView.jsx`, `services/admin_tickets.py` |
+| REST API, auth on every route, role checks, validation, docs | `routers/`, Swagger at `/api/v1/docs` |
+| AI key safety, graceful failure, cost control | [AI integration](#ai-integration) |
+
+## Tech stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Frontend | React + Vite + shadcn/ui | Fast to build, accessible components |
+| Backend | FastAPI + Pydantic | Validation and Swagger docs built in |
+| Database | PostgreSQL (`schema.sql`) | Rules enforced in the DB too (paid + pending = earned; a ticket's book must belong to its author) |
+| AI | Google Gemini (Flash / Flash-Lite) | See [why Gemini](#why-gemini) |
+| Live updates | Polling | Simple, works on free hosting |
+
+## Run locally
+
+Needs **Python 3.12**, **Node 20+**, **Docker Desktop**. A [Gemini API key](https://aistudio.google.com/apikey) is optional: without it, the app works with keyword rules and manual replies.
+
+```bash
+# 1. Database
+docker compose up -d
+
+# 2. Backend → http://localhost:8000/api/v1/docs
+cd backend
+python -m venv .venv && .venv\Scripts\activate   # macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+copy .env.example .env                           # macOS/Linux: cp. Set JWT_SECRET (and GEMINI_* for AI)
+python -m app.seed                               # 10 authors, 18 books, 2 admins, 6 sample tickets
+uvicorn app.main:app --reload
+
+# 3. Frontend → http://localhost:5173
+cd frontend
+copy .env.example .env
+npm install && npm run dev
+```
+
+**Tests:** in `backend/`, `pip install -r requirements-dev.txt` then `pytest -q` (database running and seeded).
 
 ## Architecture decisions
 
 | Decision | Why |
 |---|---|
-| FastAPI + Pydantic | Input validation and Swagger docs come built in |
-| PostgreSQL, `schema.sql` as the single source of truth | Rules live in the database too: royalty paid + pending = earned, and a ticket's book must belong to its author |
-| One `users` table with a role (author / admin) | One login flow; the role is read from the database on every request, never trusted from the token |
-| Author data filtered by the token, never by an ID from the request | An author can't see someone else's books by editing the URL |
-| JWT auth, bcrypt passwords | Stateless and simple; same error for wrong email or wrong password |
-| One error format: `{"error": {"code", "message"}}` | Frontend handles every error the same way; no raw 500s reach the browser |
-| One database transaction per request (`get_db`, `scope="function"`) | A request's changes are saved together or not at all; the commit finishes before the response, so a failed commit is a 500, never a false success. AI calls run with no transaction open |
-| Every API request logged in `request_logs` (except browser CORS checks and `/health`) | Full audit trail: who called what, status, time taken; passwords and tokens masked, response bodies never stored, written in its own transaction so failed requests are still logged |
-| AI runs after the ticket is saved | A slow or failing AI never blocks an author |
-| Queue sorted by urgency: unresolved first, then Critical → Low, then oldest; rows waiting on us over 48 h are flagged red | The brief asks for urgent and old tickets to be easy to spot; 48 h is the reply time the team promises |
-| Polling (5 s author, 10 s admin) instead of WebSockets | Simple, easy to explain, works on free hosting. Pauses while the tab is hidden; a refresh never overwrites a newer local change (`hooks/use-api.js`) |
-| React + Vite + shadcn/ui | Fast to build, accessible components we own; design notes in [`frontend/DESIGN.md`](frontend/DESIGN.md) |
+| Role read from the DB on every request | A role in the token is never trusted |
+| Author data filtered by the token, never by an ID in the URL | Another author's book or ticket returns 404 |
+| AI classification runs after the ticket is saved | A slow or failing AI never blocks the author |
+| One DB transaction per request | All of a request's changes are saved, or none |
+| One error format: `{"error": {"code", "message"}}` | The frontend handles every error the same way; no raw 500s |
+| Every request logged in `request_logs`, every AI call in `llm_logs` | Audit trail and cost tracking; passwords and tokens masked |
+| Polling: author 5 s, admin 10 s, slowing to 3× while nothing changes | Near-real-time without WebSockets; pauses when the tab is hidden |
+| Queue sorted by urgency: unresolved → Critical to Low → oldest | Urgent and long-waiting tickets are at the top |
 
 ## AI integration
 
-**Model: Google Gemini (Flash / Flash-Lite)**, set in `backend/.env`. Why this over gpt-4o-mini or Claude Haiku, which the brief suggests:
+### Why Gemini
 
-- **Cost:** a free tier, so the live demo can be tested without a paid key; the paid price is in the same low range as the other two.
-- **Strict JSON:** Gemini accepts a response schema, so classification can only return one of the 6 categories and 4 priorities (and we validate it again in code).
-- **Speed:** Flash models answer in about 1-3 s, which matters because the draft is made while the admin opens the ticket.
-- **Swappable:** all calls go through `services/llm.py`, so moving to another provider changes one file.
+- **Cost:** free tier, so the demo needs no paid key.
+- **Strict JSON:** a response schema means classification can only return valid categories and priorities.
+- **Speed:** Flash answers in ~1-3 s while the admin opens a ticket.
+- **Two models:** `GEMINI_CLASSIFY_MODEL` (cheap, Flash-Lite) for triage, `GEMINI_MODEL` (Flash) for drafts.
+- **Swappable:** every AI call goes through `services/llm.py`.
 
-Two settings so each job uses the cheapest model that does it well:
+### What the AI does
 
-| Setting | Used for | Suggested |
-|---|---|---|
-| `GEMINI_CLASSIFY_MODEL` | category + priority (short, structured) | a Flash-Lite model |
-| `GEMINI_MODEL` | reply drafts (quality matters) | a Flash model |
+| Feature | How |
+|---|---|
+| Classification | One call → `{category, priority, reasoning}` as JSON, validated again in code. Priority rubric from the brief (ISBN errors at least High). Never overrules an admin's choice |
+| Draft reply | Made when an admin opens a ticket, then cached. Follows BookLeaf's tone rules: acknowledge first, real numbers, own mistakes, clear timeline, next step |
+| Facts from code, not the model | Payout due dates, ₹1,000 threshold, "likely overdue" flag, production stage. The model quotes them; it doesn't calculate |
+| General / account-level tickets | Prompt gets one short line per book, so the reply still has real numbers |
+| Category changed | Cached draft is dropped and a fresh one is made with the right policy |
 
-Model IDs change often; copy current ones from [AI Studio](https://aistudio.google.com). The key and model names live only in backend environment variables and never reach the browser.
+### Cost control (~550 tokens per classification, ~1,100 per draft)
 
-**1. Classification** (`services/ai_classifier.py`): runs in the background after the ticket is saved, so the author never waits. One call returns `{category, priority, reasoning}` as JSON restricted to the 6 categories and 4 priorities, and the result is validated again in code. The prompt has a priority rubric from the brief (ISBN errors at least High; "no royalty for 6 months" above "update my bio"). The AI never overrules a category or priority an admin already set; its suggestion is kept beside the admin's choice.
+- Only the knowledge-base section for the ticket's category
+- Only the ticket's book, not all books
+- Original query + last 3 messages, each capped in length
+- Drafts cached; "Regenerate" is explicit
+- Rate limits on AI calls; every call logged with tokens in `llm_logs`
 
-**2. Draft reply** (`services/ai_drafts.py`): made when an admin opens a ticket, cached in `ticket_drafts`, and edited before sending. Replies started from a draft are marked `is_ai_drafted`. Prompt rules: acknowledge first, use the real numbers given, own BookLeaf's mistakes, give a timeline, end with a next step, never invent facts.
+### When the AI fails
 
-**Facts are computed in code, not by the model:** payout due dates (quarter end + 45 days), the ₹1,000 rollover threshold, a "likely overdue" flag, and for books in production the current stage ("stage 3 of 9, Cover Design; next: Typesetting…"). The model is told to quote these, not calculate them. The sample data's last payouts are in 2025, so today's date is always passed in.
+| Situation | What happens |
+|---|---|
+| AI down, timeout or quota used up | Ticket still created; keyword rules set category/priority (shown as "Keyword rules") |
+| Draft can't be made | Admin sees "AI draft unavailable" + the reason, and writes the reply by hand |
+| AI back again | "Classify with AI" button re-runs classification |
+| Retries | One retry for server errors/timeouts; none for 429 (quota) |
 
-**General / Account-level tickets** have no book, so the prompt gets one short line per book (status, copies sold, pending, last payout) and, for royalty questions, the total pending and a per-book overdue / rollover verdict. A "where are my royalties?" without a book picked still gets real numbers.
+Test it: set a wrong `GEMINI_API_KEY`.
 
-**Draft kept in sync with the category:** if an admin (or the background AI) changes the category, the cached draft is dropped, because it quoted the old category's policy. The panel then loads a fresh one.
-
-**Saving tokens** (about 550 tokens per classification, about 1,100 per draft):
-
-- only the knowledge-base section for the ticket's category, not the whole knowledge base (`services/knowledge_base.py`)
-- only the one book the ticket is about, not the author's other books (account-level tickets get one line per book)
-- the original query plus the last 3 messages, each capped in length
-- drafts cached: reopening a ticket costs nothing; "Regenerate" is explicit
-- the seed never calls the AI; sample tickets are pre-classified
-- every call is logged in `llm_logs` (tokens, latency, outcome) so cost can be checked
-
-**When the AI fails** (`services/llm.py`): 20 s timeout; one retry only for server errors or timeouts; no retry on 429 (quota used up). Then:
-
-- the ticket is still created; keyword rules set the category and priority, marked "Keyword rules (AI unavailable)"
-- the admin sees "AI draft unavailable" with the reason, and replies by hand
-- "Classify with AI" re-runs it once the AI is back
-
-To test it, set a wrong `GEMINI_API_KEY`.
-
-**Privacy:** prompts carry the author's first name and the book's data only: no email, phone or city, and internal notes are never sent. On the free tier Google may use the data sent to improve its products; production should use a paid tier.
+**Privacy:** prompts carry the author's first name and book data only; no email, phone or internal notes.
 
 ## API
 
-Full interactive docs: http://localhost:8000/api/v1/docs. All paths start with `/api/v1`. Send `Authorization: Bearer <token>`.
+All paths start with `/api/v1`. Send `Authorization: Bearer <token>`.
+
+**Try it in Swagger:** open http://localhost:8000/api/v1/docs → call `POST /auth/login` with a test login → copy `access_token` → click **Authorize** → paste it.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| GET | `/health` | anyone | Server is up |
-| POST | `/auth/login` | anyone | Email + password → token and user (with role) |
+| POST | `/auth/login` | anyone | Email + password → token + user role |
 | GET | `/auth/me` | logged in | Current user |
-| GET | `/books` | author | The logged-in author's books (in production first, then newest) |
-| GET | `/books/{id}` | author | One of their books; another author's book returns 404 |
-| POST | `/tickets` | author | Raise a query (`book_id: null` = General / Account level) |
-| GET | `/tickets` | author | Their tickets, most recently updated first |
-| GET | `/tickets/{id}` | author | One ticket with its thread (never internal notes); another author's returns 404 |
-| POST | `/tickets/{id}/replies` | author | Reply on their ticket; reopens a Resolved ticket, 409 if Closed |
-| GET | `/admin/tickets` | admin | Queue. Filters: `status`, `category`, `priority` (repeatable), `assigned` (any / me / unassigned), `created_from`, `created_to`, `q`; `sort` = urgency (default), oldest, newest, updated |
-| GET | `/admin/tickets/{id}` | admin | Ticket with thread, internal notes, author profile and book data |
-| PATCH | `/admin/tickets/{id}` | admin | Change status, override category / priority (AI suggestion kept), assign / unassign |
-| POST | `/admin/tickets/{id}/notes` | admin | Internal note (never shown to the author) |
-| POST | `/admin/tickets/{id}/replies` | admin | Reply to the author; first reply moves Open → In Progress |
-| GET | `/admin/tickets/{id}/draft` | admin | AI-drafted reply (made once, then cached). `available: false` + `reason` if AI is down |
-| POST | `/admin/tickets/{id}/draft` | admin | Make a fresh draft |
-| POST | `/admin/tickets/{id}/classify` | admin | Re-run AI classification and apply it (503 if AI is down) |
-| GET | `/admin/team` | admin | Admins a ticket can be assigned to |
-| GET | `/admin/summary` | admin | Ticket counts for the dashboard |
+| GET | `/books` | author | My books |
+| GET | `/books/{id}` | author | One of my books |
+| POST | `/tickets` | author | Raise a query (`book_id: null` = General) |
+| GET | `/tickets` | author | My tickets |
+| GET | `/tickets/{id}` | author | One ticket with replies (no internal notes) |
+| POST | `/tickets/{id}/replies` | author | Reply; reopens a Resolved ticket |
+| GET | `/admin/tickets` | admin | Queue with filters + summary counts |
+| GET | `/admin/tickets/{id}` | admin | Ticket, notes, author and book details |
+| PATCH | `/admin/tickets/{id}` | admin | Status, category, priority, assignee |
+| POST | `/admin/tickets/{id}/notes` | admin | Internal note |
+| POST | `/admin/tickets/{id}/replies` | admin | Reply to the author |
+| GET / POST | `/admin/tickets/{id}/draft` | admin | Get cached AI draft / make a new one |
+| POST | `/admin/tickets/{id}/classify` | admin | Re-run AI classification |
+| GET | `/admin/team` | admin | Admins to assign to |
+| GET | `/health` | anyone | Server is up |
 
-Status codes: 401 not logged in or bad token, 403 wrong role, 404 not found, 413 body over 64 KB, 422 invalid input (lists each field), 429 rate limited (with a `Retry-After` header).
+**Errors:** 401 not logged in · 403 wrong role · 404 not found · 409 ticket closed · 413 body too big · 422 invalid input (per field) · 429 rate limited · 503 AI unavailable.
 
 ## Security
 
-| Protection | How |
+| Area | Protection |
 |---|---|
-| Passwords | bcrypt; same error and same response time for a wrong email or a wrong password |
-| Login rate limit | 5 failed attempts per account + IP, and 20 per IP, per 15 min, then 429. Checked before the password; a correct login clears the count |
-| AI cost limit | 5 new tickets per author per 10 min; 10 AI calls per user and 30 in total per minute. Over the limit the AI is skipped and the app falls back (keyword rules / manual reply) |
-| Access control | Role read from the database on every request; author data filtered by the token, never by an ID from the request; another author's ticket or book returns 404 |
-| Input | Pydantic limits on every field; request bodies over 64 KB rejected; search wildcards escaped; ORM only (no raw SQL with user input) |
-| Browser | CORS allows only the frontend's origin, no cookies; `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, HSTS in production |
-| Secrets | Only in environment variables; `.env` is git-ignored; the Gemini key never reaches the browser; the server refuses a short or example `JWT_SECRET` |
-| AI | Author text is fenced as data in prompts; drafts are never sent automatically; prompts carry no email, phone or internal notes |
+| Passwords | bcrypt; same error for wrong email or wrong password |
+| Login | Failed tries capped per account + IP (5), per account from any IP (10), per IP (20), per 15 min |
+| Access | Role checked on every route; authors only see their own data |
+| Input | Length limits on every field; bodies over 64 KB, or chunked (no Content-Length), rejected |
+| Secrets | Only in env variables; `.env` git-ignored; AI key never sent to the browser |
+| Browser | CORS limited to the frontend; security headers on the API and the frontend site; HSTS in production |
+| AI | Author text treated as data, not instructions; drafts never sent automatically |
 
-Rate-limit counts are kept in memory, which suits the single server this runs on. With several servers they would move to Redis. On Render, start uvicorn with `--proxy-headers --forwarded-allow-ips='*'` so limits see the visitor's real IP, not the proxy's: `--proxy-headers` alone only trusts a proxy on 127.0.0.1, so every visitor would share one IP and 20 failed logins from anyone would lock out everyone. Trusting `*` is only safe because Render's proxy is the only way in; it also means a client can fake its IP, so per-IP limits slow down casual guessing but don't stop a determined attacker.
-
-## Known limitations
-
-- Tokens can't be revoked before they expire (24 h); rate-limit counters reset when the server restarts.
-- `request_logs` grows with polling (~12 rows a minute per open tab) and has no automatic clean-up yet; production would delete rows older than 30-90 days on a schedule.
-- Login token is kept in `localStorage`; an httpOnly cookie would be safer.
-- File attachments are UI only (the form shows the chosen file names; nothing is uploaded).
-- Polling instead of WebSockets.
-- Gemini free tier: low daily limits, and Google may use the data sent to it. Use a paid tier in production.
-- The AI draft doesn't see internal notes (on purpose, so nothing private leaks); the admin adds that context when editing.
-- Sample royalty data uses a flat amount per copy, not the 80/20 net-profit formula from the policy; the app shows the stored figures as they are.
+**Visitor IP behind Render's proxy:** the API starts with `--proxy-headers --forwarded-allow-ips='*'` so rate limits see the visitor's IP, not the proxy's (otherwise every visitor shares one IP and 20 failed logins lock out everyone). Trusting `*` is safe only because Render's proxy is the only way in, and a client can still fake its IP; that's why one account also has a cap from any IP.
 
 ## Deploy
 
-`render.yaml` sets up everything on [Render](https://render.com) (free plans): Postgres, the API and the static frontend.
+`render.yaml` creates the database, API and frontend on [Render](https://render.com) (free plans).
 
-1. Push this repo to GitHub. On Render: **New → Blueprint** → pick the repo.
-2. Fill the values Render asks for:
-   - `bookleaf-api` → `CORS_ORIGINS` = the frontend URL (e.g. `https://bookleaf-web.onrender.com`), plus `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_CLASSIFY_MODEL`
-   - `bookleaf-web` → `VITE_API_URL` = the API URL + `/api/v1` (e.g. `https://bookleaf-api.onrender.com/api/v1`)
-3. Deploy. The API start command runs `python -m app.seed` first: it creates the schema on the empty database and loads the sample data, so the demo is pre-seeded. `JWT_SECRET` is generated by Render.
-4. Open `/health` on the frontend to check it can reach the API, then put both URLs at the top of this README.
+1. Render → **New → Blueprint** → pick this repo.
+2. Fill in:
+   - `bookleaf-api`: `CORS_ORIGINS` = frontend URL, plus `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_CLASSIFY_MODEL`
+   - `bookleaf-web`: `VITE_API_URL` = API URL + `/api/v1`
+3. Deploy. The API seeds the sample data on start; `JWT_SECRET` is generated.
+4. Put both URLs at the top of this README.
 
-Notes: Render's free API sleeps after 15 minutes idle (the first request then takes ~1 minute), and free Postgres expires after 30 days. The frontend also works on Vercel (`frontend/vercel.json` handles page refreshes on deep links).
+Note: the free API sleeps after 15 min idle (first request takes ~1 min).
+
+## Known limitations
+
+- File attachments are UI only (nothing is uploaded).
+- Polling, not WebSockets.
+- Login token in `localStorage`; can't be revoked before it expires (24 h).
+- Rate limits are in memory (reset on restart; Redis needed for several servers).
+- `request_logs` has no automatic clean-up yet.
+- Sample royalties are a flat amount per copy, not the 80/20 formula; shown as stored.
+- Gemini free tier has low daily limits.
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
 | Seed fails on `author_royalty_per_copy` | Old database: `docker compose down -v`, `docker compose up -d`, seed again |
-| Port 5432 already in use | Another Postgres is running; stop it, or map `5433:5432` and update `backend/.env` |
+| Port 5432 in use | Stop the other Postgres, or map `5433:5432` and update `backend/.env` |
 | `No module named 'app'` | Run `uvicorn` from inside `backend/` |
-| Login works but passwords don't match | `python -m app.seed --reset-passwords` |
+| Passwords don't work | `python -m app.seed --reset-passwords` |
+| Queue cards show "–" | Restart the backend so it runs the latest code |

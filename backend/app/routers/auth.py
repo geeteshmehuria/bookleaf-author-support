@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.core.database import DbSession
 from app.core.deps import get_current_user
 from app.core.errors import APIError
-from app.core.rate_limit import LOGIN_FAILS_PER_ACCOUNT, LOGIN_FAILS_PER_IP, client_ip
+from app.core.rate_limit import LOGIN_FAILS_PER_ACCOUNT, LOGIN_FAILS_PER_EMAIL, LOGIN_FAILS_PER_IP, client_ip
 from app.core.security import DUMMY_PASSWORD_HASH, create_access_token, verify_password
 from app.models import User
 from app.schemas.auth import LoginRequest, TokenResponse, UserOut
@@ -23,6 +23,7 @@ def login(body: LoginRequest, request: Request, db: DbSession) -> TokenResponse:
     account_key = f"{ip}:{body.email}"
     # Checked BEFORE the password, so a blocked caller can't keep testing passwords.
     LOGIN_FAILS_PER_ACCOUNT.check(account_key)
+    LOGIN_FAILS_PER_EMAIL.check(body.email)
     LOGIN_FAILS_PER_IP.check(ip)
 
     user = db.scalar(select(User).where(User.email == body.email))
@@ -31,11 +32,13 @@ def login(body: LoginRequest, request: Request, db: DbSession) -> TokenResponse:
     password_ok = verify_password(body.password, user.password_hash if user else DUMMY_PASSWORD_HASH)
     if user is None or not password_ok:
         LOGIN_FAILS_PER_ACCOUNT.record(account_key)
+        LOGIN_FAILS_PER_EMAIL.record(body.email)
         LOGIN_FAILS_PER_IP.record(ip)
         # Same message for both cases: don't reveal which emails have accounts.
         raise APIError(401, "INVALID_CREDENTIALS", "Incorrect email or password")
 
     LOGIN_FAILS_PER_ACCOUNT.reset(account_key)  # a correct password clears earlier mistakes
+    LOGIN_FAILS_PER_EMAIL.reset(body.email)
     request.state.user_id = user.id  # for the request log (called_by)
 
     token, expires_in = create_access_token(user.id, user.role_name)

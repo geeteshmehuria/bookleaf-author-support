@@ -89,8 +89,11 @@ def client_ip(request: Request) -> str:
 
 # Login: count FAILED attempts only, so normal use never trips it.
 #  - per email + IP: stops guessing one account's password
+#  - per email (any IP): the IP can be faked with an X-Forwarded-For header behind a proxy,
+#    so one account also has a cap no matter where the guesses come from
 #  - per IP: stops one machine trying many different accounts
 LOGIN_FAILS_PER_ACCOUNT = RateLimiter(5, 15 * 60, "Too many failed login attempts")
+LOGIN_FAILS_PER_EMAIL = RateLimiter(10, 15 * 60, "Too many failed login attempts for this account")
 LOGIN_FAILS_PER_IP = RateLimiter(20, 15 * 60, "Too many failed login attempts from this network")
 
 # New tickets: each one triggers an AI classification call.
@@ -101,4 +104,4 @@ TICKETS_PER_AUTHOR = RateLimiter(5, 10 * 60, "You've raised several queries in a
 AI_CALLS_PER_USER = RateLimiter(10, 60, "Too many AI requests")
 AI_CALLS_TOTAL = RateLimiter(30, 60, "The AI is busy")
 
-ALL_LIMITERS = [LOGIN_FAILS_PER_ACCOUNT, LOGIN_FAILS_PER_IP, TICKETS_PER_AUTHOR, AI_CALLS_PER_USER, AI_CALLS_TOTAL]
+ALL_LIMITERS = [LOGIN_FAILS_PER_ACCOUNT, LOGIN_FAILS_PER_EMAIL, LOGIN_FAILS_PER_IP, TICKETS_PER_AUTHOR, AI_CALLS_PER_USER, AI_CALLS_TOTAL]
